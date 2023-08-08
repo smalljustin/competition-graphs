@@ -1,0 +1,9 @@
+[meta]
+name = "CompetitionGraphs"
+author = "sgt_bigbird"
+category = "Overlay"
+version = "0.2.1"
+
+[script]
+dependencies = [ "VehicleState", "Camera" ]
+timeout = 0
