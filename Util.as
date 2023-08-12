@@ -57,23 +57,23 @@ float __getStandardDeviation(array<float> @values) {
     return rollingVariance ** 0.5;
 }
 
-float _getStandardDeviation(array<array<CpLog>> @cpLogArrayArray) {
-    if (cpLogArrayArray.Length == 0) {
+float _getStandardDeviation(array<array<DataPoint>> @DataPointArrayArray) {
+    if (DataPointArrayArray.Length == 0) {
         return DEFAULT;
     }
     array<float> runTimes();
-    for (int i = 0; i < cpLogArrayArray.Length; i++) {
-        runTimes.InsertLast(cpLogArrayArray[i][cpLogArrayArray[i].Length - 1].time);
+    for (int i = 0; i < DataPointArrayArray.Length; i++) {
+        runTimes.InsertLast(DataPointArrayArray[i][DataPointArrayArray[i].Length - 1].time);
     }
     return __getStandardDeviation(runTimes);
 }
 
-float getStandardDeviation(array<array<CpLog>> @cpLogArrayArray, int numLast) {
+float getStandardDeviation(array<array<DataPoint>> @DataPointArrayArray, int numLast) {
     // Gets the standard deviation of the last n elements.
-    numLast = Math::Min(cpLogArrayArray.Length, numLast);
-    array<array<CpLog>> runsForStandardDeviation(); 
+    numLast = Math::Min(DataPointArrayArray.Length, numLast);
+    array<array<DataPoint>> runsForStandardDeviation(); 
     for (int i = 0; i < numLast; i++) {
-        runsForStandardDeviation.InsertLast(cpLogArrayArray[i]);
+        runsForStandardDeviation.InsertLast(DataPointArrayArray[i]);
     }
     return _getStandardDeviation(runsForStandardDeviation);
 }
