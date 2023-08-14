@@ -137,7 +137,7 @@ class ScatterHistogram {
             float time = this.mapChallenge.json_payload[i].time;
             HistogramGroup@ hg = histogramGroupArray[cur_hga];
 
-            if (time > hg.lower && time <= hg.upper) {
+            if (time >= hg.lower && time <= hg.upper) {
                 hg.DataPointArrays.InsertLast(this.mapChallenge.json_payload[i]);
             } else {
                 if (time < hg.lower) {
@@ -157,7 +157,7 @@ class ScatterHistogram {
     }
 
     void reloadValueRange() {
-        valueRange = vec4(mapChallenge.json_payload[0].time - 100, mapChallenge.json_payload[(int(mapChallenge.json_payload.Length) * 0.9)].time, -1, Math::Max(1, getMaxHistogramCount()));
+        valueRange = vec4(mapChallenge.json_payload[0].time - 100, mapChallenge.json_payload[(int(mapChallenge.json_payload.Length) * TARGET_DISPLAY_PERCENT)].time, -1, Math::Max(1, getMaxHistogramCount()));
     }
     
     int getMaxHistogramCount() {
@@ -222,6 +222,9 @@ class ScatterHistogram {
         if (histogramGroupArray is null || histogramGroupArray.IsEmpty() || histogramGroupArray[0] is null) {
             return;
         }
+
+        float count_val = 1 - RECORD_FRAC / 3;
+
         for (int i = 0; i < histogramGroupArray.Length; i++) {
             array<DataPoint@>@ activeArr = histogramGroupArray[i].DataPointArrays;
             if (activeArr is null || activeArr.Length == 0) {
@@ -234,6 +237,12 @@ class ScatterHistogram {
                 if (histogramGroupArray[i].DataPointArrays.Length == 1) {
                     y_loc = 0;
                 }
+
+                count_val += RECORD_FRAC;
+                if (count_val < 1) {
+                    continue;
+                }
+                count_val -= 1;
 
                 vec4 color = HISTOGRAM_RUN_COLOR;
 

@@ -24,29 +24,20 @@ string getMapUid() {
   return "";
 }
 
-void RenderMenu() {
-  if (UI::BeginMenu(Icons::Cog + " PB Grapher")) {
-    if (UI::MenuItem("Manage Custom Time Targets")) {
-      showTimeInputWindow = !showTimeInputWindow;
-    }
-      if (UI::MenuItem("Show/Hide Graph")) {
-      g_visible = !g_visible;
-    }
-    UI::EndMenu();
-  }
-}
-
 bool shouldNotRender() {
     bool ret = !g_visible
       || !UI::IsRendering()
       || getMapUid() == ""
-      || (!SHOW_WITH_HIDDEN_INTERFACE && !UI::IsGameUIVisible())
+      || !UI::IsGameUIVisible()
       || GetApp().CurrentPlayground is null
       || GetApp().CurrentPlayground.Interface is null;
     return ret;
 }
 
 void Render() {
+  if (shouldNotRender()) {
+    return;
+  }
   auto app = GetApp();
   if (app.CurrentPlayground!is null && (app.CurrentPlayground.UIConfigs.Length > 0)) {
     if (app.CurrentPlayground.UIConfigs[0].UISequence == CGamePlaygroundUIConfig::EUISequence::Intro) {
