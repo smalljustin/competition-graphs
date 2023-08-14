@@ -77,6 +77,10 @@ class ChallengeData {
     }
 
     void load() {
+        if (offset >= MAX_RECORDS) {
+            processDivs();
+            return;
+        }
         print("Loading offset " + tostring(offset) + " with length " + tostring(length));
         print("https://map-monitor.xk.io/api/challenges/" + this.challenge_id + "/records/maps/" + this.uid + "?length=" + tostring(this.length) + "&offset=" + tostring(this.offset));
         Net::HttpRequest@ request = Net::HttpGet("https://map-monitor.xk.io/api/challenges/"+ this.challenge_id + "/records/maps/" + this.uid + "?length=" + tostring(this.length) + "&offset=" + tostring(this.offset));
@@ -100,7 +104,6 @@ class ChallengeData {
             if (points_added == this.length) {
                 this.offset += this.length;
                 load();
-                print("Loading additional data");
             }   
             processDivs();
 

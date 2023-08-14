@@ -29,9 +29,6 @@ void RenderMenu() {
     if (UI::MenuItem("Manage Custom Time Targets")) {
       showTimeInputWindow = !showTimeInputWindow;
     }
-      if (UI::MenuItem("Switch to/from Histogram")) {
-      HISTOGRAM_VIEW = !HISTOGRAM_VIEW;
-    }
       if (UI::MenuItem("Show/Hide Graph")) {
       g_visible = !g_visible;
     }

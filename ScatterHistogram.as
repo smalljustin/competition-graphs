@@ -110,7 +110,7 @@ class ScatterHistogram {
 
     int getCutOffTimeAtDiv(int target_time, int precision) {
         for (int i = 0; i < mapChallenge.divs.Length; i++) {
-            if (Math::Abs(mapChallenge.divs[i].max_time - target_time) < precision * 0.5) {
+            if (Math::Abs(mapChallenge.divs[i].max_time - target_time) < precision) {
                 return Math::Max(mapChallenge.divs[i].max_time, target_time);
 
             }
@@ -137,7 +137,7 @@ class ScatterHistogram {
             float time = this.mapChallenge.json_payload[i].time;
             HistogramGroup@ hg = histogramGroupArray[cur_hga];
 
-            if (time >= hg.lower && time < hg.upper) {
+            if (time > hg.lower && time <= hg.upper) {
                 hg.DataPointArrays.InsertLast(this.mapChallenge.json_payload[i]);
             } else {
                 if (time < hg.lower) {
@@ -157,7 +157,7 @@ class ScatterHistogram {
     }
 
     void reloadValueRange() {
-        valueRange = vec4(mapChallenge.json_payload[0].time - 100, mapChallenge.json_payload[0].time * GET_SLOWEST_RUN_CUTOFF(), -1, Math::Max(1, getMaxHistogramCount()));
+        valueRange = vec4(mapChallenge.json_payload[0].time - 100, mapChallenge.json_payload[(int(mapChallenge.json_payload.Length) * 0.9)].time, -1, Math::Max(1, getMaxHistogramCount()));
     }
     
     int getMaxHistogramCount() {
@@ -203,14 +203,6 @@ class ScatterHistogram {
     }
 
 
-    float GET_SLOWEST_RUN_CUTOFF() {
-        if (HISTOGRAM_VIEW) {
-            return SLOW_RUN_CUTOFF_HIST;
-        } else {
-            return SLOW_RUN_CUTOFF_SCATTER;
-        }
-    }
-
     vec2 TransformToViewBounds(const vec2 & in point,
         const vec2 & in min,
             const vec2 & in max) {
@@ -222,7 +214,6 @@ class ScatterHistogram {
     void OnSettingsChanged() {
         startnew(CoroutineFunc(this.reloadHistogramData));
     }
-
 
     void renderHistogram() {
         if (mapChallenge.json_payload.IsEmpty()) {
