@@ -77,11 +77,6 @@ class ChallengeData {
     }
 
     void load() {
-        if (offset > 500) {
-            this.processDivs();
-            return;
-        }
-
         print("Loading offset " + tostring(offset) + " with length " + tostring(length));
         print("https://map-monitor.xk.io/api/challenges/" + this.challenge_id + "/records/maps/" + this.uid + "?length=" + tostring(this.length) + "&offset=" + tostring(this.offset));
         Net::HttpRequest@ request = Net::HttpGet("https://map-monitor.xk.io/api/challenges/"+ this.challenge_id + "/records/maps/" + this.uid + "?length=" + tostring(this.length) + "&offset=" + tostring(this.offset));
