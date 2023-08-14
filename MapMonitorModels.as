@@ -68,24 +68,29 @@ class ChallengeData {
         startnew(CoroutineFunc(this.load));
     }
 
-    void changeMap(string _map_uuid) {
+    void changeMap(int challenge_id, string _map_uuid) {
         this.uid = _map_uuid;
-        this.json_payload.RemoveRange(0, json_payload.Length);
+        this.challenge_id = challenge_id;
+        this.json_payload.RemoveRange(0, this.json_payload.Length);
+        this.offset = 0;
         startnew(CoroutineFunc(this.load));
     }
 
     void load() {
-        print("Loading offset " + tostring(offset) + " with length " + tostring(length));
+        if (offset > 500) {
+            this.processDivs();
+            return;
+        }
 
-        print("https://map-monitor.xk.io/api/challenges/4347/records/maps/" + this.uid + "?length=" + tostring(this.length) + "&offset=" + tostring(this.offset));
-        Net::HttpRequest@ request = Net::HttpGet("https://map-monitor.xk.io/api/challenges/4347/records/maps/" + this.uid + "?length=" + tostring(this.length) + "&offset=" + tostring(this.offset));
+        print("Loading offset " + tostring(offset) + " with length " + tostring(length));
+        print("https://map-monitor.xk.io/api/challenges/" + this.challenge_id + "/records/maps/" + this.uid + "?length=" + tostring(this.length) + "&offset=" + tostring(this.offset));
+        Net::HttpRequest@ request = Net::HttpGet("https://map-monitor.xk.io/api/challenges/"+ this.challenge_id + "/records/maps/" + this.uid + "?length=" + tostring(this.length) + "&offset=" + tostring(this.offset));
         int points_added;
         while (!request.Finished()) {
             yield();
         }
         if (request.ResponseCode() == 200) {
             Json::Value@ obj = Json::Parse(request.String());
-            print(request.String());
             this.challenge_id = obj["challenge_id"];
             this.uid = obj["uid"];
             this.length = obj["length"];
@@ -112,7 +117,6 @@ class ChallengeData {
     int parseDataPoint(Json::Value@ obj) {
         for (int i = 0; i < obj.Length; i++) {
             json_payload.InsertLast(DataPoint(obj[i]));
-            print("Now at item " + tostring(json_payload.Length));
         }
         return obj.Length;
     }
@@ -128,11 +132,7 @@ class ChallengeData {
                 this.divs[active_div_number].max_time = dp.time;
             }
             this.divs[active_div_number].max_time = dp.time;
-
         }
-        this.divs.InsertLast(this.divs[active_div_number]);
-
-        
     }
 }
 
@@ -142,6 +142,7 @@ class DataPoint
     string player;
     int rank;
     int div;
+    float focus;
 	
 	DataPoint() {}
 
@@ -150,19 +151,39 @@ class DataPoint
         this.player = obj["player"];
         this.rank = obj["rank"];
         this.div = 1 + (rank / 64);
+        this.focus = 0;
     }
-    
+
+    void decrease() {
+        this.focus = Math::Max(0, this.focus - 0.1);
+    }
+    void increase() {
+        this.focus = Math::Min(1, this.focus + 5);
+    }    
 }
 
 class Div
 {
     int min_time;
-    int max_time; 
-    Div() {}
+    int max_time;
+    float render_fade;
+    Div() {
+        min_time = 0;
+        max_time = 10 ** 6;
+    }
     
     Div(int min_time, int max_time) {
         this.min_time = min_time;
         this.max_time = max_time;
+        this.render_fade = 0;
+    }
+
+    void increase() {
+        this.render_fade = Math::Min(render_fade + 0.05, 1);
+    }
+
+    void decrease() {
+        this.render_fade = Math::Max(render_fade - 0.01, 0);
     }
 
     string tostring() {

@@ -5,5 +5,5 @@ category = "Overlay"
 version = "0.2.1"
 
 [script]
-dependencies = [ "VehicleState", "Camera" ]
+dependencies = [ "VehicleState", "Camera", "NadeoServices" ]
 timeout = 0

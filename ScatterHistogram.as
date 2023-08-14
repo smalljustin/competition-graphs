@@ -1,14 +1,9 @@
 class ScatterHistogram {
-    array < DataPoint > @ data;
-    array < HistogramGroup > histogramGroupArray();
-
-    DataPoint @ fastest_run = DataPoint();
-    DataPoint @ slowest_run = DataPoint();
+    array < HistogramGroup@ >@ histogramGroupArray = array<HistogramGroup@>();
 
     ChallengeData mapChallenge;
 
     float precision;
-
     vec4 valueRange;
 
     bool WINDOW_MOVING;
@@ -20,11 +15,9 @@ class ScatterHistogram {
 
     vec4 pending_v;
 
-    ScatterHistogram() {}
+    int challenge_id; 
 
-    ScatterHistogram(ChallengeData @ c) {
-        this.mapChallenge.json_payload = c.json_payload;
-    }
+    ScatterHistogram() {}
 
     vec4 getValueRange() {
         // Returns the value range, offset by the current mouse position and click location.
@@ -70,18 +63,24 @@ class ScatterHistogram {
         if (active_map_uuid != getMapUid()) {
             active_map_uuid = getMapUid();
             is_totd = true;
-            mapChallenge.changeMap(active_map_uuid);
-            startnew(CoroutineFunc(this.updateFastestRun));
+            startnew(CoroutineFunc(this.updateMap));
             updatePbTime();
         }
         renderBackground();
         renderHistogram();
         if (mapChallenge.updated) {
-            reloadHistogramData();
+            startnew(CoroutineFunc(this.reloadHistogramData));
             mapChallenge.updated = false;
         }
         handleWindowMoving();
+        handleDivs();
         renderMouseHover();
+    }
+
+    void handleDivs() {
+        for (int i = 0; i < mapChallenge.divs.Length; i++) {
+            mapChallenge.divs[i].decrease();
+        }
     }
 
     void renderBackground() {
@@ -95,40 +94,70 @@ class ScatterHistogram {
         nvg::Stroke();
     }
 
-    void updateFastestRun() {
+    void updateMap() {
+        active_map_totd_date = TOTD::GetDateMapWasTOTD_Async(getMapUid());
+        challenge_id = GetChallengeForDate(active_map_totd_date.SubStr(0, 10));
+        if (challenge_id == 0) {
+            is_totd = false;
+            return;
+        }
+        print("Map TOTD date: " + active_map_totd_date + ", challenge ID: " + challenge_id);
+        mapChallenge.changeMap(challenge_id, active_map_uuid);
         while (mapChallenge.json_payload.Length == 0) {
             yield();
         }
-        fastest_run = mapChallenge.json_payload[0];
-        reloadHistogramData();
     }
+
+    int getCutOffTimeAtDiv(int target_time, int precision) {
+        for (int i = 0; i < mapChallenge.divs.Length; i++) {
+            if (Math::Abs(mapChallenge.divs[i].max_time - target_time) < precision * 0.5) {
+                return Math::Max(mapChallenge.divs[i].max_time, target_time);
+
+            }
+        }
+        return target_time;
+    }
+
 
     void reloadHistogramData() {
         if (this.mapChallenge.json_payload.Length == 0) {
             return;
         }
         precision = HIST_PRECISION_VALUE * 1000;
-        histogramGroupArray = array < HistogramGroup > ();
-        for (int i = fastest_run.time; i < this.mapChallenge.json_payload[this.mapChallenge.json_payload.Length - 1].time; i += precision) {
-            histogramGroupArray.InsertLast(HistogramGroup(i, i + precision));
+        histogramGroupArray.RemoveRange(0, histogramGroupArray.Length);
+        int i;
+        for (i = this.mapChallenge.json_payload[0].time; i < this.mapChallenge.json_payload[this.mapChallenge.json_payload.Length - 1].time ;) {
+            int res_upper = getCutOffTimeAtDiv(i + precision, precision);
+            histogramGroupArray.InsertLast(HistogramGroup(i, res_upper));
+            i = res_upper;
         }
 
-        int end_pos = this.mapChallenge.json_payload.Length - HIST_RUN_START_OFFSET;
-        int start_pos = Math::Max(0, end_pos - HIST_RUNS_TO_SHOW);
-
-        for (int i = start_pos; i < end_pos; i++) {
+        int cur_hga = 0;
+        for (int i = 0; i < this.mapChallenge.json_payload.Length; i++) {
             float time = this.mapChallenge.json_payload[i].time;
-            int idx = (time - fastest_run.time) / precision;
-            if (idx >= histogramGroupArray.Length) {
-                continue;
+            HistogramGroup@ hg = histogramGroupArray[cur_hga];
+
+            if (time >= hg.lower && time < hg.upper) {
+                hg.DataPointArrays.InsertLast(this.mapChallenge.json_payload[i]);
+            } else {
+                if (time < hg.lower) {
+                    print(time);
+                    print(hg.toString());
+                    warn("Unexpected behavior! Report this to the dev. This error message will only confuse them, though."); 
+                } else {
+                    if (cur_hga != histogramGroupArray.Length - 1) {
+                        cur_hga += 1;
+                        i -= 1; // force it to rerun on the next one
+                    }
+                }
             }
-            histogramGroupArray[idx].DataPointArrays.InsertLast(this.mapChallenge.json_payload[i]);
         }
+
         reloadValueRange();
     }
 
     void reloadValueRange() {
-        valueRange = vec4(mapChallenge.json_payload[0].time, mapChallenge.json_payload[0].time * GET_SLOWEST_RUN_CUTOFF(), 0, getMaxHistogramCount());
+        valueRange = vec4(mapChallenge.json_payload[0].time - 100, mapChallenge.json_payload[0].time * GET_SLOWEST_RUN_CUTOFF(), -1, Math::Max(1, getMaxHistogramCount()));
     }
     
     int getMaxHistogramCount() {
@@ -191,7 +220,7 @@ class ScatterHistogram {
     }
 
     void OnSettingsChanged() {
-        this.reloadHistogramData();
+        startnew(CoroutineFunc(this.reloadHistogramData));
     }
 
 
@@ -199,15 +228,17 @@ class ScatterHistogram {
         if (mapChallenge.json_payload.IsEmpty()) {
             return;
         }
+        if (histogramGroupArray is null || histogramGroupArray.IsEmpty() || histogramGroupArray[0] is null) {
+            return;
+        }
         for (int i = 0; i < histogramGroupArray.Length; i++) {
-            for (int j = 0; j < histogramGroupArray[i].DataPointArrays.Length; j++) {
-                array<DataPoint@>@ activeArr = histogramGroupArray[i].DataPointArrays;
+            array<DataPoint@>@ activeArr = histogramGroupArray[i].DataPointArrays;
+            if (activeArr is null || activeArr.Length == 0) {
+                continue;
+            }
+            for (int j = 0; j < activeArr.Length; j++) {
                 float x_loc = activeArr[j].time;
-                float y_loc =  Math::Lerp(0, histogramGroupArray[i].DataPointArrays.Length,
-                    Math::InvLerp(
-                        getMinRank(@histogramGroupArray[i]),
-                        getMaxRank(@histogramGroupArray[i]),
-                        activeArr[j].rank));
+                float y_loc = j;
 
                 if (histogramGroupArray[i].DataPointArrays.Length == 1) {
                     y_loc = 0;
@@ -222,30 +253,44 @@ class ScatterHistogram {
                 color.x %= 1;
                 color.y %= 1;
                 color.z %= 1;
-
-                
                 
                 nvg::BeginPath();
                 nvg::Circle(
                     TransformToViewBounds(ClampVec2(vec2(x_loc, y_loc), getValueRange()), min, max),
                     POINT_RADIUS
                 );
+
                 nvg::StrokeColor(color);
-                nvg::StrokeWidth(POINT_RADIUS ** 2);
+                nvg::StrokeWidth((POINT_RADIUS + activeArr[j].focus) ** 2);
                 nvg::Stroke();
                 nvg::ClosePath();
             }
         }
 
+        if (pbTime != 0) {
+            renderLine(pbTime, vec4(1, 1, 1, 1));
+        }
+
+        renderLine(mapChallenge.divs[1].max_time, vec4(1, 1, 0, mapChallenge.divs[1].render_fade));
+
+        for (int i = 2; i < mapChallenge.divs.Length; i++) {
+            Div@ d = mapChallenge.divs[i];
+            renderLine(d.min_time, vec4(1, 1, 0, d.render_fade));
+            renderLine(d.max_time, vec4(1, 1, 0, d.render_fade));
+        }
+    }
+
+    void renderLine(int time, vec4 color) {
+        if (getValueRange().w == 0) {
+            return;
+        }
         nvg::BeginPath();
-        nvg::MoveTo(TransformToViewBounds(ClampVec2(vec2(pbTime, valueRange.w), getValueRange()), min, max));
-        nvg::LineTo(TransformToViewBounds(ClampVec2(vec2(pbTime, valueRange.z), getValueRange()), min, max));
+        nvg::MoveTo(TransformToViewBounds(ClampVec2(vec2(time, valueRange.w), getValueRange()), min, max));
+        nvg::LineTo(TransformToViewBounds(ClampVec2(vec2(time, valueRange.z), getValueRange()), min, max));
         nvg::StrokeWidth(1);
-        nvg::StrokeColor(vec4(1, 1, 1, 1));
+        nvg::StrokeColor(color);
         nvg::Stroke();
         nvg::ClosePath();
-
-        
     }
 
     vec2 ClampVec2(const vec2 & in val, const vec4 & in bounds) {
@@ -272,51 +317,52 @@ class ScatterHistogram {
     }
 
     void renderMouseHover() {
+        if (mapChallenge.json_payload.Length == 0) {
+            return;
+        }
+
         vec2 mouse_pos = UI::GetMousePos();
+        
+        if ((mouse_pos.x < graph_x_offset || mouse_pos.x > graph_width + graph_x_offset) || 
+            (mouse_pos.y < graph_y_offset || mouse_pos.y > graph_height + graph_y_offset)) {
+                return;
+            }
+
+        if (histogramGroupArray is null || histogramGroupArray.Length == 0) {
+            return;
+        }
+
         string text; 
 
         float mouse_hover_x = Math::Lerp(valueRange.x, valueRange.y, Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, mouse_pos.x));
-        float mouse_hover_y = Math::Lerp(valueRange.z, valueRange.w, Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, mouse_pos.y));
+        float mouse_hover_y = Math::Lerp(valueRange.w, valueRange.z, Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, mouse_pos.y));
 
-        int idx = (mouse_hover_x - fastest_run.time) / precision;
-
-        if (idx < 0 || idx >= histogramGroupArray.Length) {
-            return;
-        }
-
-        HistogramGroup@ histGroup = histogramGroupArray[idx];
-        if (histGroup is null || histGroup.DataPointArrays.IsEmpty()) {
-            return;
-        }
-
+        HistogramGroup@ histGroup;
         // find the closest datapoint to the mouse cursor
 
-        
-        DataPoint@ closestPoint = histGroup.DataPointArrays[0];
-        DataPoint@ curPoint = histGroup.DataPointArrays[0];
-        float max_dist = Math::Sqrt((curPoint.time - mouse_hover_x) ** 2 + (0 - mouse_hover_y) ** 2);
-
-        for (int i = 0; i < histGroup.DataPointArrays.Length; i++) { 
-            if (histGroup.DataPointArrays is null) {
-                return;
+        for (int i = 0; i < histogramGroupArray.Length; i++) {
+            if (histogramGroupArray[i] !is null && histogramGroupArray[i].lower <= mouse_hover_x && histogramGroupArray[i].upper > mouse_hover_x) {
+                @histGroup = histogramGroupArray[i];
             }
-            curPoint = histGroup.DataPointArrays[0];
-            float cur_dist = Math::Sqrt((curPoint.time - mouse_hover_x) ** 2 + (i - mouse_hover_y) ** 2);
-            
-            if (cur_dist < max_dist) {
-                closestPoint = curPoint;
-                max_dist = cur_dist;
+            /* unrelated decay */
+            for (int j = 0; j < histogramGroupArray[i].DataPointArrays.Length; j++) {
+                histogramGroupArray[i].DataPointArrays[j].decrease();
             }
         }
 
-        text = "Time: " + Text::Format("%.3f", float(mapChallenge.divs[closestPoint.div].min_time) / 1000) + " to " + Text::Format("%.3f", float(mapChallenge.divs[closestPoint.div].max_time) / 1000);
-        text += "\tDiv: " + tostring(closestPoint.div);
+        if (histGroup is null || histGroup.DataPointArrays is null || histGroup.DataPointArrays.IsEmpty()) {
+            return;
+        }
+        int player_idx = Math::Clamp(mouse_hover_y, float(0), float(histGroup.DataPointArrays.Length - 1));
+        histGroup.DataPointArrays[player_idx].increase(); 
+        mapChallenge.divs[histGroup.DataPointArrays[player_idx].div].increase();
 
+        text = "\tTime: " + Text::Format("%.3f", float(histGroup.DataPointArrays[player_idx].time) / 1000);
+        text += "\tDiv: " + tostring(histGroup.DataPointArrays[player_idx].div);
+        text += "\tRank: " + Text::Format("%d", histGroup.DataPointArrays[player_idx].rank);
 
         nvg::BeginPath();
-        // nvg::Rect(mouse_pos - vec2(0, nvg::TextBounds(text).y), nvg::TextBounds(text));
         nvg::FillColor(vec4(.9, .9, .9, 1));
-        // nvg::Fill();
         nvg::Text(mouse_pos, text);
         nvg::Stroke();
         nvg::ClosePath();
