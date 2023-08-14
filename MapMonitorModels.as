@@ -141,6 +141,7 @@ class DataPoint
     int rank;
     int div;
     float focus;
+    bool visible;
 	
 	DataPoint() {}
 
@@ -154,6 +155,7 @@ class DataPoint
 
     void decrease() {
         this.focus = Math::Max(0, this.focus - 0.1);
+        this.visible = false;
     }
     void increase() {
         this.focus = Math::Min(1, this.focus + 5);

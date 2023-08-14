@@ -244,6 +244,8 @@ class ScatterHistogram {
                 }
                 count_val -= 1;
 
+                activeArr[j].visible = true;
+
                 vec4 color = HISTOGRAM_RUN_COLOR;
 
                 color.x += 0.05 * activeArr[j].div;
@@ -344,22 +346,39 @@ class ScatterHistogram {
             if (histogramGroupArray[i] !is null && histogramGroupArray[i].lower <= mouse_hover_x && histogramGroupArray[i].upper > mouse_hover_x) {
                 @histGroup = histogramGroupArray[i];
             }
-            /* unrelated decay */
-            for (int j = 0; j < histogramGroupArray[i].DataPointArrays.Length; j++) {
-                histogramGroupArray[i].DataPointArrays[j].decrease();
-            }
         }
 
         if (histGroup is null || histGroup.DataPointArrays is null || histGroup.DataPointArrays.IsEmpty()) {
             return;
         }
         int player_idx = Math::Clamp(mouse_hover_y, float(0), float(histGroup.DataPointArrays.Length - 1));
-        histGroup.DataPointArrays[player_idx].increase(); 
-        mapChallenge.divs[histGroup.DataPointArrays[player_idx].div].increase();
 
-        text = "\tTime: " + Text::Format("%.3f", float(histGroup.DataPointArrays[player_idx].time) / 1000);
-        text += "\tDiv: " + tostring(histGroup.DataPointArrays[player_idx].div);
-        text += "\tRank: " + Text::Format("%d", histGroup.DataPointArrays[player_idx].rank);
+        DataPoint@ selectedPoint;
+
+        for (int i = player_idx; i >= 0; i--) {
+            if (histGroup.DataPointArrays[player_idx].visible) {
+                @selectedPoint = histGroup.DataPointArrays[player_idx];
+                break;
+            }
+        }
+
+        for (int i = 0; i < histogramGroupArray.Length; i++) {
+            for (int j = 0; j < histogramGroupArray[i].DataPointArrays.Length; j++) {
+                histogramGroupArray[i].DataPointArrays[j].decrease();
+            }
+        }
+        if (selectedPoint is null) {
+            return;
+        }
+
+        selectedPoint.increase(); 
+        mapChallenge.divs[selectedPoint.div].increase();
+
+        text = "Time: " + Text::Format("%.3f", float(selectedPoint.time) / 1000);
+        text += "\tDiv: " + tostring(selectedPoint.div);
+        text += "\tRank: " + Text::Format("%d", selectedPoint.rank);
+
+        mouse_pos.x -= 200;
 
         nvg::BeginPath();
         nvg::FillColor(vec4(.9, .9, .9, 1));
