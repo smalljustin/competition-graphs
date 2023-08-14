@@ -17,6 +17,12 @@ class ScatterHistogram {
 
     int challenge_id; 
 
+    bool focused;
+
+    float BorderWidth = 0;
+
+    CLICK_LOCATION curClickLocEnum = CLICK_LOCATION::NOEDGE;
+
     ScatterHistogram() {}
 
     vec4 getValueRange() {
@@ -27,10 +33,10 @@ class ScatterHistogram {
         vec2 current_loc = UI::GetMousePos();
         pending_v = valueRange;
         float click_x_offset = Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, click_loc.x);
-        float click_y_offset = Math::InvLerp(graph_x_offset, graph_y_offset + graph_width, click_loc.y);
+        float click_y_offset = Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, click_loc.y);
 
         float current_x_offset = Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, current_loc.x);
-        float current_y_offset = Math::InvLerp(graph_x_offset, graph_y_offset + graph_width, current_loc.y);
+        float current_y_offset = Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, current_loc.y);
 
         float realized_x_offset = Math::Lerp(0, valueRange.y - valueRange.x, (current_x_offset - click_x_offset));
         float realized_y_offset = Math::Lerp(0, valueRange.w - valueRange.z, (current_y_offset - click_y_offset));
@@ -73,6 +79,7 @@ class ScatterHistogram {
             mapChallenge.updated = false;
         }
         handleWindowMoving();
+        handleWindowResize();
         handleDivs();
         renderMouseHover();
     }
@@ -118,6 +125,36 @@ class ScatterHistogram {
         return target_time;
     }
 
+    void handleWindowResize() {
+        if (curClickLocEnum == CLICK_LOCATION::NOEDGE) {
+            return;
+        }
+        
+        vec2 mouse_pos = UI::GetMousePos();
+        if (curClickLocEnum == CLICK_LOCATION::TLC ) {
+            graph_x_offset = mouse_pos.x;
+            graph_y_offset = mouse_pos.y;
+            return;
+        }
+
+        if (curClickLocEnum == CLICK_LOCATION::LEFTEDGE) {
+            graph_x_offset = mouse_pos.x;
+        }
+
+        if (curClickLocEnum == CLICK_LOCATION::TOPEDGE) {
+            graph_y_offset = mouse_pos.y;
+        }
+
+        if (curClickLocEnum == CLICK_LOCATION::RIGHTEDGE || curClickLocEnum == CLICK_LOCATION::TRC || curClickLocEnum == CLICK_LOCATION::BRC) {
+            graph_width = mouse_pos.x - graph_x_offset;
+        }
+
+        if (curClickLocEnum == CLICK_LOCATION::BOTTOMEDGE || curClickLocEnum == CLICK_LOCATION::BLC || curClickLocEnum == CLICK_LOCATION::BRC) {
+            graph_height = mouse_pos.y - graph_y_offset;
+        }
+
+
+    }
 
     void reloadHistogramData() {
         if (this.mapChallenge.json_payload.Length == 0) {
@@ -133,7 +170,7 @@ class ScatterHistogram {
         }
 
         int cur_hga = 0;
-        for (int i = 0; i < this.mapChallenge.json_payload.Length; i++) {
+        for (int i = 0; i < Math::Min(this.mapChallenge.json_payload.Length, MAX_RECORDS); i++) {
             float time = this.mapChallenge.json_payload[i].time;
             HistogramGroup@ hg = histogramGroupArray[cur_hga];
 
@@ -212,6 +249,7 @@ class ScatterHistogram {
     }
 
     void OnSettingsChanged() {
+        startnew(CoroutineFunc(this.mapChallenge.load_external));
         startnew(CoroutineFunc(this.reloadHistogramData));
     }
 
@@ -223,7 +261,16 @@ class ScatterHistogram {
             return;
         }
 
-        float count_val = 1 - RECORD_FRAC / 3;
+
+        float rf; 
+
+        if (focused) {
+            rf = FOCUSED_RECORD_FRAC;
+        } else {
+            rf = NONFOCUSED_RECORD_FRAC; 
+        }
+
+        float count_val = 1 - rf / 3;
 
         for (int i = 0; i < histogramGroupArray.Length; i++) {
             array<DataPoint@>@ activeArr = histogramGroupArray[i].DataPointArrays;
@@ -238,7 +285,7 @@ class ScatterHistogram {
                     y_loc = 0;
                 }
 
-                count_val += RECORD_FRAC;
+                count_val += rf;
                 if (count_val < 1) {
                     continue;
                 }
@@ -283,12 +330,14 @@ class ScatterHistogram {
     }
 
     void renderLine(int time, vec4 color) {
-        if (getValueRange().w == 0) {
+        vec4 vr = getValueRange();
+
+        if (vr.w == 0) {
             return;
         }
         nvg::BeginPath();
-        nvg::MoveTo(TransformToViewBounds(ClampVec2(vec2(time, valueRange.w), getValueRange()), min, max));
-        nvg::LineTo(TransformToViewBounds(ClampVec2(vec2(time, valueRange.z), getValueRange()), min, max));
+        nvg::MoveTo(TransformToViewBounds(ClampVec2(vec2(time, vr.w), vr), min, max));
+        nvg::LineTo(TransformToViewBounds(ClampVec2(vec2(time, vr.z), vr), min, max));
         nvg::StrokeWidth(1);
         nvg::StrokeColor(color);
         nvg::Stroke();
@@ -307,15 +356,74 @@ class ScatterHistogram {
     }
 
     void OnMouseButton(bool down, int button, int x, int y) {
-        if (button == 1) {
-            reloadValueRange();
+        CLICK_LOCATION clickLocType = getClickLocEnum(x, y);
+        if (clickLocType != CLICK_LOCATION::NOEDGE) {
+            if (down) {
+                curClickLocEnum = clickLocType;
+            } else {
+                curClickLocEnum = CLICK_LOCATION::NOEDGE;
+            }
             return;
         }
-        WINDOW_MOVING = down;
-        click_loc = vec2(x, y);
-        if (!down) {
-            valueRange = pending_v;
+
+        if (!down || (x > graph_x_offset && x < graph_x_offset + graph_width && y > graph_y_offset && y < graph_y_offset + graph_height)) {
+            if (button == 1) {
+                reloadValueRange();
+                return;
+            }
+            if (down)
+                focused = true; 
+            
+            WINDOW_MOVING = down;
+            click_loc = vec2(x, y);
+            if (!down) {
+                valueRange = pending_v;
+            }
+        } else {
+            focused = false;
         }
+    }
+
+    CLICK_LOCATION getClickLocEnum(int x, int y) {
+        if (WINDOW_MOVING) {
+            return CLICK_LOCATION::NOEDGE;
+        }
+
+        bool isLeftEdge = isNear(x, graph_x_offset, 10);
+        bool isRightEdge = isNear(x, graph_x_offset + graph_width, 10);
+        bool isTopEdge = isNear(y, graph_y_offset, 10);
+        bool isBottomEdge = isNear(y, graph_y_offset + graph_height, 10);
+
+        if (isLeftEdge && isTopEdge) {
+            return CLICK_LOCATION::TLC;
+        }
+        if (isLeftEdge && isBottomEdge) {
+            return CLICK_LOCATION::BLC;
+        }
+        if (isRightEdge && isTopEdge) {
+            return CLICK_LOCATION::TRC;
+        }
+        if (isRightEdge && isBottomEdge) {
+            return CLICK_LOCATION::BRC;
+        }
+
+        if (isLeftEdge) {
+            return CLICK_LOCATION::LEFTEDGE;
+        }
+        if (isRightEdge) {
+            return CLICK_LOCATION::RIGHTEDGE;
+        }
+        if (isTopEdge) {
+            return CLICK_LOCATION::TOPEDGE;
+        }
+        if (isBottomEdge) {
+            return CLICK_LOCATION::BOTTOMEDGE;
+        }
+        return CLICK_LOCATION::NOEDGE;
+    }
+
+    bool isNear(int test, int ref, int window) {
+        return Math::Abs(test - ref) < window;
     }
 
     void renderMouseHover() {
@@ -323,7 +431,16 @@ class ScatterHistogram {
             return;
         }
 
+        vec4 vr = getValueRange();
+
         vec2 mouse_pos = UI::GetMousePos();
+
+        if (getClickLocEnum(mouse_pos.x, mouse_pos.y) != CLICK_LOCATION::NOEDGE) {
+            BorderWidth = Math::Min(BorderWidth + 0.5, CLICK_ZONE);
+        } else {
+            BorderWidth = Math::Max(BorderWidth - 0.5, 0);
+        }
+
         
         if ((mouse_pos.x < graph_x_offset || mouse_pos.x > graph_width + graph_x_offset) || 
             (mouse_pos.y < graph_y_offset || mouse_pos.y > graph_height + graph_y_offset)) {
@@ -336,15 +453,22 @@ class ScatterHistogram {
 
         string text; 
 
-        float mouse_hover_x = Math::Lerp(valueRange.x, valueRange.y, Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, mouse_pos.x));
-        float mouse_hover_y = Math::Lerp(valueRange.w, valueRange.z, Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, mouse_pos.y));
+        float mouse_hover_x = Math::Lerp(vr.x, vr.y, Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, mouse_pos.x));
+        float mouse_hover_y = Math::Lerp(vr.w, vr.z, Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, mouse_pos.y));
 
         HistogramGroup@ histGroup;
         // find the closest datapoint to the mouse cursor
 
+        bool matched = false;
+
         for (int i = 0; i < histogramGroupArray.Length; i++) {
             if (histogramGroupArray[i] !is null && histogramGroupArray[i].lower <= mouse_hover_x && histogramGroupArray[i].upper > mouse_hover_x) {
+                matched = true;
+                
+            }
+            if (matched && histogramGroupArray[i].DataPointArrays.Length > 0) {
                 @histGroup = histogramGroupArray[i];
+                break;
             }
         }
 
@@ -386,6 +510,17 @@ class ScatterHistogram {
         nvg::Stroke();
         nvg::ClosePath();
     }
-
     
+}
+
+enum CLICK_LOCATION {
+    TOPEDGE,
+    LEFTEDGE,
+    BOTTOMEDGE,
+    RIGHTEDGE,
+    TLC,
+    BLC,
+    BRC,
+    TRC,
+    NOEDGE
 }

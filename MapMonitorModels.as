@@ -46,6 +46,9 @@ class ChallengeData {
     Challenge challenge;
     bool updated;
 
+
+    bool locked = false;
+
     array<Div> divs(128);
 
     ChallengeData() {}
@@ -76,9 +79,19 @@ class ChallengeData {
         startnew(CoroutineFunc(this.load));
     }
 
+    void load_external() {
+        if (locked) {
+            return;
+        }
+        trace("External call: doing load.");
+        locked = true;
+        this.load();
+    }
+
     void load() {
         if (offset >= MAX_RECORDS) {
             processDivs();
+            locked = false;
             return;
         }
         print("Loading offset " + tostring(offset) + " with length " + tostring(length));
@@ -101,12 +114,13 @@ class ChallengeData {
             this.refresh_in = obj["refresh_in"];
             this.challenge = Challenge(obj["challenge"]);
             this.updated = true;
+            this.offset += obj["json_payload"].Length;
             if (points_added == this.length) {
-                this.offset += this.length;
                 load();
-            }   
+            } else {
+                locked = false;
+            }
             processDivs();
-
         } else {
             is_totd = false;
         }
