@@ -541,16 +541,18 @@ class ScatterHistogram {
 
         vec2 mouse_pos = UI::GetMousePos();
 
-        if (getClickLocEnum(mouse_pos.x, mouse_pos.y) != CLICK_LOCATION::NOEDGE) {
+        bool outOfClickableZone = (mouse_pos.x < graph_x_offset - CLICK_ZONE || mouse_pos.x > graph_width + graph_x_offset + CLICK_ZONE) || 
+            (mouse_pos.y < graph_y_offset - CLICK_ZONE || mouse_pos.y > graph_height + graph_y_offset + CLICK_ZONE);
+        
+        if (!outOfClickableZone && getClickLocEnum(mouse_pos.x, mouse_pos.y) != CLICK_LOCATION::NOEDGE) {
             BorderWidth = Math::Min(BorderWidth + 0.5, CLICK_ZONE / 2);
         } else {
             BorderWidth = Math::Max(BorderWidth - 0.5, 0);
         }
 
-        if ((mouse_pos.x < graph_x_offset || mouse_pos.x > graph_width + graph_x_offset) || 
-            (mouse_pos.y < graph_y_offset || mouse_pos.y > graph_height + graph_y_offset)) {
-                return;
-            }
+        if (outOfClickableZone) {
+            return;
+        }
 
         if (histogramGroupArray is null || histogramGroupArray.Length == 0) {
             return;
