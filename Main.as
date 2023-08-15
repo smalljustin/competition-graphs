@@ -27,13 +27,27 @@ bool shouldNotRender() {
     bool ret = !g_visible
       || !UI::IsRendering()
       || getMapUid() == ""
-      || !UI::IsGameUIVisible()
+      || (!SHOW_WITH_HIDDEN_INTERFACE && !UI::IsGameUIVisible()) 
       || GetApp().CurrentPlayground is null
       || GetApp().CurrentPlayground.Interface is null;
+      
     return ret;
 }
 
+void RenderInterface() {
+  if (RENDERINTERFACE_RENDER_MODE) {
+    DoRender();
+  }
+}
+
 void Render() {
+  if (!RENDERINTERFACE_RENDER_MODE) {
+    DoRender();
+  }
+}
+
+
+void DoRender() {
   if (shouldNotRender()) {
     return;
   }

@@ -1,6 +1,12 @@
 [Setting category="General" name="Visible"]
 bool g_visible = true;
 
+[Setting category="General" name="Show graph when game interface hidden"]
+bool SHOW_WITH_HIDDEN_INTERFACE = false;
+
+[Setting category="General" name="Only render when Openplanet (F3) menu is open"] 
+bool RENDERINTERFACE_RENDER_MODE = false;
+
 [Setting category="Display" name="Graph Width" drag min=50 max=2000]
 int graph_width = 1000;
 
