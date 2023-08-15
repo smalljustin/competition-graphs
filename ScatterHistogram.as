@@ -27,6 +27,21 @@ class ScatterHistogram {
 
     ScatterHistogram() {}
 
+    array<DataPoint@> dataPointsToPrint;
+
+    array<vec2> dataPointsToPrintLocations;
+    
+    bool shouldDecay = false;
+
+    void printDataPoints() {
+        for (int i = 0; i < dataPointsToPrint.Length; i++) {
+            _renderDataPointText(dataPointsToPrint[i], dataPointsToPrintLocations[i]);
+        }
+
+        dataPointsToPrint.RemoveRange(0, dataPointsToPrint.Length);
+        dataPointsToPrintLocations.RemoveRange(0, dataPointsToPrintLocations.Length);
+    }
+
     vec4 getValueRange() {
         // Returns the value range, offset by the current mouse position and click location.
         if (!WINDOW_MOVING) {
@@ -80,19 +95,35 @@ class ScatterHistogram {
         }
         renderBackground();
         renderHistogram();
+
+        renderMouseHover();
+        printDataPoints();
         handleWindowMoving();
         handleWindowResize();
         handleDivs();
-        renderMouseHover();
         handlePointDecay();
     }
 
     void handlePointDecay() {
+        vec4 vr = getValueRange();
+        HistogramGroup@ histogramGroup;
+
+        if (!this.shouldDecay) {
+            return;
+        }
+
+        bool decayDone = false;
+
         for (int i = 0; i < histogramGroupArray.Length; i++) {
-            for (int j = 0; j < histogramGroupArray[i].DataPointArrays.Length; j++) {
-                histogramGroupArray[i].DataPointArrays[j].decrease();
+            @histogramGroup = @histogramGroupArray[i];
+            for (int j = 0; j < histogramGroup.DataPointArrays.Length; j++) {
+                decayDone = histogramGroup.DataPointArrays[j].decrease() || decayDone;
+                if (!focused) {
+                    histogramGroup.DataPointArrays[j].clicked = false;
+                }
             }
         }
+        this.shouldDecay = decayDone;
     }
 
     void handleDivs() {
@@ -189,10 +220,10 @@ class ScatterHistogram {
         int cur_hga = 0;
         for (int i = 0; i < Math::Min(this.mapChallenge.json_payload.Length, MAX_RECORDS); i++) {
             float time = this.mapChallenge.json_payload[i].time;
-            HistogramGroup@ hg = histogramGroupArray[cur_hga];
+            HistogramGroup@ hg = @histogramGroupArray[cur_hga];
 
             if (time >= hg.lower && time <= hg.upper) {
-                hg.DataPointArrays.InsertLast(this.mapChallenge.json_payload[i]);
+                hg.DataPointArrays.InsertLast(@this.mapChallenge.json_payload[i]);
             } else {
                 if (time < hg.lower) {
                     print(time);
@@ -279,7 +310,6 @@ class ScatterHistogram {
             return;
         }
 
-
         float rf; 
 
         if (focused) {
@@ -290,16 +320,31 @@ class ScatterHistogram {
 
         float count_val = 1 - rf / 3;
 
+        vec4 vr = getValueRange();
+
         for (int i = 0; i < histogramGroupArray.Length; i++) {
-            array<DataPoint@>@ activeArr = histogramGroupArray[i].DataPointArrays;
+            HistogramGroup@ activeGroup = @histogramGroupArray[i];
+            array<DataPoint@>@ activeArr = @activeGroup.DataPointArrays;
             if (activeArr is null || activeArr.Length == 0) {
                 continue;
             }
+            if ((focused && activeGroup.upper < vr.x) || activeGroup.lower > vr.y) {
+                continue;
+            }
+
             for (int j = 0; j < activeArr.Length; j++) {
                 float x_loc = activeArr[j].time;
                 float y_loc = j;
 
-                if (histogramGroupArray[i].DataPointArrays.Length == 1) {
+                if (Math::IsInf(x_loc) || Math::IsNaN(x_loc)) {
+                    continue;
+                }
+
+                if (Math::IsInf(y_loc) || Math::IsNaN(y_loc)) {
+                    continue;
+                }
+
+                if (activeArr.Length == 1) {
                     y_loc = 0;
                 }
 
@@ -308,6 +353,10 @@ class ScatterHistogram {
                     continue;
                 }
                 count_val -= 1;
+
+                if (j < vr.z || j > vr.w) {
+                    continue;
+                }
 
                 activeArr[j].visible = true;
 
@@ -321,9 +370,23 @@ class ScatterHistogram {
                 color.y %= 1;
                 color.z %= 1;
                 
+                if (activeArr[j].clicked) {
+                    nvg::BeginPath();
+                    nvg::Circle(
+                        TransformToViewBounds(ClampVec2(vec2(x_loc, y_loc), vr), min, max),
+                        curPointRadius + 2
+                    );
+
+                    nvg::StrokeColor(vec4(1, 1, 1, 1));
+                    nvg::StrokeWidth(curPointRadius ** 2);
+                    nvg::Stroke();
+                    nvg::ClosePath();
+                    renderDataPointText(activeArr[j], TransformToViewBounds(ClampVec2(vec2(x_loc, y_loc), getValueRange()), min, max));
+                }
+
                 nvg::BeginPath();
                 nvg::Circle(
-                    TransformToViewBounds(ClampVec2(vec2(x_loc, y_loc), getValueRange()), min, max),
+                    TransformToViewBounds(ClampVec2(vec2(x_loc, y_loc), vr), min, max),
                     curPointRadius
                 );
 
@@ -331,6 +394,7 @@ class ScatterHistogram {
                 nvg::StrokeWidth((curPointRadius + activeArr[j].focus) ** 2);
                 nvg::Stroke();
                 nvg::ClosePath();
+
             }
         }
 
@@ -374,47 +438,55 @@ class ScatterHistogram {
     }
 
     void OnMouseButton(bool down, int button, int x, int y) {
-        CLICK_LOCATION clickLocType = getClickLocEnum(x, y);
-        if (clickLocType != CLICK_LOCATION::NOEDGE) {
-            if (down) {
-                curClickLocEnum = clickLocType;
-            } else {
-                curClickLocEnum = CLICK_LOCATION::NOEDGE;
+        if (!down) {
+            if (WINDOW_MOVING) {
+                valueRange = pending_v;
+                WINDOW_MOVING = down;
             }
-            return;
         }
 
-        if (!down || (x > graph_x_offset && x < graph_x_offset + graph_width && y > graph_y_offset && y < graph_y_offset + graph_height)) {
+        if (!down || (x > graph_x_offset - CLICK_ZONE && x < graph_x_offset + graph_width + CLICK_ZONE && y > graph_y_offset - CLICK_ZONE && y < graph_y_offset + graph_height + CLICK_ZONE)) {
             if (button == 1) {
                 reloadValueRange();
                 return;
             }
             if (down)
                 focused = true;
-
+            
             // Check if we have a point active (i.e., at 100% focus):
 
             DataPoint@ activePoint;
             for (int i = 0; i < histogramGroupArray.Length; i++) {
                 for (int j = 0; j < histogramGroupArray[i].DataPointArrays.Length; j++) {
                     if (histogramGroupArray[i].DataPointArrays[j].focus == .9) {
-                        activePoint = histogramGroupArray[i].DataPointArrays[j];
+                        @activePoint = histogramGroupArray[i].DataPointArrays[j];
                     }
                 }
             }
-
             if (activePoint is null) {
-                // Otherwise, do the slidey thing. 
+                // Then check if we're clicking an edge
+                CLICK_LOCATION clickLocType = getClickLocEnum(x, y);
+                if (clickLocType != CLICK_LOCATION::NOEDGE) {
+                    if (down) {
+                        curClickLocEnum = clickLocType;
+                    } else {
+                        curClickLocEnum = CLICK_LOCATION::NOEDGE;
+                    }
+                    return;
+                }
+                // Otherwise, pan the graph
                 WINDOW_MOVING = down;
                 click_loc = vec2(x, y);
-                if (!down) {
-                    valueRange = pending_v;
-                }
+
             } else {
-                activePoint.clicked = true;
+                if (down) {
+                    activePoint.clicked = !activePoint.clicked;
+                    shouldDecay = true;
+                }
             }
         } else {
             focused = false;
+            shouldDecay = true;
         }
     }
 
@@ -423,10 +495,10 @@ class ScatterHistogram {
             return CLICK_LOCATION::NOEDGE;
         }
 
-        bool isLeftEdge = isNear(x, graph_x_offset - curPointRadius ** 2, 10);
-        bool isRightEdge = isNear(x, graph_x_offset + graph_width + curPointRadius ** 2, 10);
-        bool isTopEdge = isNear(y, graph_y_offset - curPointRadius ** 2, 10);
-        bool isBottomEdge = isNear(y, graph_y_offset + graph_height + curPointRadius ** 2, 10);
+        bool isLeftEdge = isNear(x, graph_x_offset - curPointRadius ** 2, CLICK_ZONE);
+        bool isRightEdge = isNear(x, graph_x_offset + graph_width + curPointRadius ** 2, CLICK_ZONE);
+        bool isTopEdge = isNear(y, graph_y_offset - curPointRadius ** 2, CLICK_ZONE);
+        bool isBottomEdge = isNear(y, graph_y_offset + graph_height + curPointRadius ** 2, CLICK_ZONE);
 
         if (isLeftEdge && isTopEdge) {
             return CLICK_LOCATION::TLC;
@@ -470,12 +542,11 @@ class ScatterHistogram {
         vec2 mouse_pos = UI::GetMousePos();
 
         if (getClickLocEnum(mouse_pos.x, mouse_pos.y) != CLICK_LOCATION::NOEDGE) {
-            BorderWidth = Math::Min(BorderWidth + 0.5, CLICK_ZONE);
+            BorderWidth = Math::Min(BorderWidth + 0.5, CLICK_ZONE / 2);
         } else {
             BorderWidth = Math::Max(BorderWidth - 0.5, 0);
         }
 
-        
         if ((mouse_pos.x < graph_x_offset || mouse_pos.x > graph_width + graph_x_offset) || 
             (mouse_pos.y < graph_y_offset || mouse_pos.y > graph_height + graph_y_offset)) {
                 return;
@@ -488,7 +559,7 @@ class ScatterHistogram {
         string text; 
 
         float mouse_hover_x = Math::Lerp(vr.x, vr.y, Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, mouse_pos.x));
-        float mouse_hover_y = Math::Lerp(vr.w, vr.z, Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, mouse_pos.y));
+        float mouse_hover_y = Math::Lerp(vr.w, vr.z, Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, mouse_pos.y - curPointRadius ** 2));
 
         HistogramGroup@ histGroup;
         // find the closest datapoint to the mouse cursor
@@ -501,7 +572,7 @@ class ScatterHistogram {
             }
             if (matched && histogramGroupArray[i].DataPointArrays.Length > 0) {
                 for (int j = 0; j < histogramGroupArray[i].DataPointArrays.Length; j++) {
-                    if (histogramGroupArray[i].DataPointArrays[j].visible) {
+                    if (histogramGroupArray[i].DataPointArrays[j].visible && Math::Abs(mouse_hover_y - j) < 4 && mouse_hover_y >= j) {
                         @histGroup = histogramGroupArray[i];
                         break;
                     }
@@ -526,25 +597,48 @@ class ScatterHistogram {
             }
         }
 
-
         if (selectedPoint is null) {
             return;
         }
 
         selectedPoint.increase(); 
         mapChallenge.divs[selectedPoint.div].increase();
+        this.shouldDecay = true;
+    }
 
-        text = "Time: " + Text::Format("%.3f", float(selectedPoint.time) / 1000);
-        text += "\tDiv: " + tostring(selectedPoint.div);
-        text += "\tRank: " + Text::Format("%d", selectedPoint.rank);
+    void renderDataPointText(DataPoint@ selectedPoint, vec2 pos) {
+        dataPointsToPrint.InsertLast(selectedPoint);
+        dataPointsToPrintLocations.InsertLast(pos);
+    }
 
-        mouse_pos.x -= 200;
+    void _renderDataPointText(DataPoint@ selectedPoint, vec2 pos) {
+        pos.y -= curPointRadius * 2;
+        string text = "Rank: " + Text::Format("%d", selectedPoint.rank);
+        text += ", Div: " + tostring(selectedPoint.div);
+        text += " - " + Text::Format("%.3f", float(selectedPoint.time) / 1000);
+
+        vec2 textSize = nvg::TextBounds(text);
+
+        vec2 textPos = pos; 
+        textPos.y -= textSize.y;
+        textPos -= vec2(Padding, Padding);
+        textSize += 2 * vec2(Padding, Padding);
+
+        nvg::BeginPath();
+        nvg::RoundedRect(textPos, textSize, BorderRadius);
+
+        vec4 c = BackdropColor;
+        c.w = 0.9;
+        nvg::FillColor(c);
+        nvg::Fill();
+        nvg::ClosePath();
 
         nvg::BeginPath();
         nvg::FillColor(vec4(.9, .9, .9, 1));
-        nvg::Text(mouse_pos, text);
+        nvg::Text(pos, text);
         nvg::Stroke();
         nvg::ClosePath();
+        
     }
 
     // x scroll not implemented because i don't have a mouse that can do that 

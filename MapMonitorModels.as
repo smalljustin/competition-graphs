@@ -38,7 +38,7 @@ class ChallengeData {
     string uid;
     int length = 100;   
     int offset;
-    array<DataPoint> json_payload;
+    array<DataPoint@>@ json_payload = array<DataPoint@>();
     float created_ts;
     float updated_ts;
     float last_update_started_ts;
@@ -52,19 +52,6 @@ class ChallengeData {
     array<Div> divs(128);
 
     ChallengeData() {}
-
-    ChallengeData(int challenge_id, const string &in uid, int length, int offset, const array<DataPoint> &in json_payload, float created_ts, float updated_ts, float last_update_started_ts, int refresh_in, const Challenge &in challenge) {
-        this.challenge_id = challenge_id;
-        this.uid = uid;
-        this.length = length;
-        this.offset = offset;
-        this.json_payload = json_payload;
-        this.created_ts = created_ts;
-        this.updated_ts = updated_ts;
-        this.last_update_started_ts = last_update_started_ts;
-        this.refresh_in = refresh_in;
-        this.challenge = challenge;
-    }
 
     ChallengeData(string _map_uuid) {
         this.uid = _map_uuid;
@@ -169,12 +156,17 @@ class DataPoint
         this.clicked = false;
     }
 
-    void decrease() {
-        this.focus = Math::Max(0, this.focus - 0.1);
+    bool decrease() {
+        if (this.focus == 0) {
+            return false;
+        } else {
+            this.focus = Math::Max(0, this.focus - 0.1);
+        }
         this.visible = false;
+        return true;
     }
     void increase() {
-        this.focus = Math::Min(1, this.focus + 5);
+        this.focus = Math::Min(1, this.focus + 0.5);
     }    
 }
 
