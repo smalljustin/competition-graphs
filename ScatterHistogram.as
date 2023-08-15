@@ -617,7 +617,7 @@ class ScatterHistogram {
         pos.y -= curPointRadius * 2;
         string text = "Rank: " + Text::Format("%d", selectedPoint.rank);
         text += ", Div: " + tostring(selectedPoint.div);
-        text += " - " + Text::Format("%.3f", float(selectedPoint.time) / 1000);
+        text += " , Time: " + Text::Format("%.3f", float(selectedPoint.time) / 1000);
 
         vec2 textSize = nvg::TextBounds(text);
 
