@@ -4,7 +4,6 @@ string surface_override = "";
 string active_map_uuid;
 string active_map_totd_date;
 bool is_totd;
-vec2 m_size;
 ScatterHistogram scatterHistogram;
 CotdApi @cotdApi;
 Debouncer debounce = Debouncer();
@@ -47,7 +46,6 @@ void Render() {
     return;
   }
   scatterHistogram.render();
-  m_size = vec2(graph_width, graph_height);
   
 }
 
@@ -197,4 +195,8 @@ uint64 ParseTime(const string &in inTime) {
   st.NextRow();
   st.NextRow();
   return st.GetColumnInt64("x");
+}
+
+void OnMouseWheel(int _, int y) {
+  scatterHistogram.OnMouseWheel(y);
 }

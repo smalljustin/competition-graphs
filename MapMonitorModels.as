@@ -156,6 +156,7 @@ class DataPoint
     int div;
     float focus;
     bool visible;
+    bool clicked;
 	
 	DataPoint() {}
 
@@ -165,6 +166,7 @@ class DataPoint
         this.rank = obj["rank"];
         this.div = 1 + (rank / 64);
         this.focus = 0;
+        this.clicked = false;
     }
 
     void decrease() {

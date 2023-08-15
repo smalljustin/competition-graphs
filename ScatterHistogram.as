@@ -21,6 +21,8 @@ class ScatterHistogram {
 
     float BorderWidth = 0;
 
+    float curPointRadius = POINT_RADIUS;
+
     CLICK_LOCATION curClickLocEnum = CLICK_LOCATION::NOEDGE;
 
     ScatterHistogram() {}
@@ -63,8 +65,8 @@ class ScatterHistogram {
 
     void render() {
         float padding = 0;
-        min = vec2(padding, graph_height - padding);
-        max = vec2(graph_width - padding, padding);
+        min = vec2(curPointRadius, graph_height - curPointRadius);
+        max = vec2(graph_width - curPointRadius, curPointRadius);
 
         if (active_map_uuid != getMapUid()) {
             active_map_uuid = getMapUid();
@@ -72,16 +74,25 @@ class ScatterHistogram {
             startnew(CoroutineFunc(this.updateMap));
             updatePbTime();
         }
-        renderBackground();
-        renderHistogram();
         if (mapChallenge.updated) {
             startnew(CoroutineFunc(this.reloadHistogramData));
             mapChallenge.updated = false;
         }
+        renderBackground();
+        renderHistogram();
         handleWindowMoving();
         handleWindowResize();
         handleDivs();
         renderMouseHover();
+        handlePointDecay();
+    }
+
+    void handlePointDecay() {
+        for (int i = 0; i < histogramGroupArray.Length; i++) {
+            for (int j = 0; j < histogramGroupArray[i].DataPointArrays.Length; j++) {
+                histogramGroupArray[i].DataPointArrays[j].decrease();
+            }
+        }
     }
 
     void handleDivs() {
@@ -92,13 +103,19 @@ class ScatterHistogram {
 
     void renderBackground() {
         nvg::BeginPath();
-        nvg::RoundedRect(graph_x_offset, graph_y_offset, m_size.x, m_size.y, BorderRadius);
+        nvg::RoundedRect(
+            graph_x_offset - curPointRadius ** 2,
+            graph_y_offset - curPointRadius ** 2,
+            graph_width + curPointRadius ** 2,
+            graph_height + curPointRadius ** 2 * 2,
+        BorderRadius);
         nvg::FillColor(BackdropColor);
         nvg::Fill();
 
         nvg::StrokeColor(BorderColor);
         nvg::StrokeWidth(BorderWidth);
         nvg::Stroke();
+        nvg::ClosePath();
     }
 
     void updateMap() {
@@ -194,6 +211,7 @@ class ScatterHistogram {
     }
 
     void reloadValueRange() {
+        curPointRadius = POINT_RADIUS;
         valueRange = vec4(mapChallenge.json_payload[0].time - 100, mapChallenge.json_payload[(int(mapChallenge.json_payload.Length) * TARGET_DISPLAY_PERCENT)].time, -1, Math::Max(1, getMaxHistogramCount()));
     }
     
@@ -306,11 +324,11 @@ class ScatterHistogram {
                 nvg::BeginPath();
                 nvg::Circle(
                     TransformToViewBounds(ClampVec2(vec2(x_loc, y_loc), getValueRange()), min, max),
-                    POINT_RADIUS
+                    curPointRadius
                 );
 
                 nvg::StrokeColor(color);
-                nvg::StrokeWidth((POINT_RADIUS + activeArr[j].focus) ** 2);
+                nvg::StrokeWidth((curPointRadius + activeArr[j].focus) ** 2);
                 nvg::Stroke();
                 nvg::ClosePath();
             }
@@ -372,12 +390,28 @@ class ScatterHistogram {
                 return;
             }
             if (down)
-                focused = true; 
-            
-            WINDOW_MOVING = down;
-            click_loc = vec2(x, y);
-            if (!down) {
-                valueRange = pending_v;
+                focused = true;
+
+            // Check if we have a point active (i.e., at 100% focus):
+
+            DataPoint@ activePoint;
+            for (int i = 0; i < histogramGroupArray.Length; i++) {
+                for (int j = 0; j < histogramGroupArray[i].DataPointArrays.Length; j++) {
+                    if (histogramGroupArray[i].DataPointArrays[j].focus == .9) {
+                        activePoint = histogramGroupArray[i].DataPointArrays[j];
+                    }
+                }
+            }
+
+            if (activePoint is null) {
+                // Otherwise, do the slidey thing. 
+                WINDOW_MOVING = down;
+                click_loc = vec2(x, y);
+                if (!down) {
+                    valueRange = pending_v;
+                }
+            } else {
+                activePoint.clicked = true;
             }
         } else {
             focused = false;
@@ -389,10 +423,10 @@ class ScatterHistogram {
             return CLICK_LOCATION::NOEDGE;
         }
 
-        bool isLeftEdge = isNear(x, graph_x_offset, 10);
-        bool isRightEdge = isNear(x, graph_x_offset + graph_width, 10);
-        bool isTopEdge = isNear(y, graph_y_offset, 10);
-        bool isBottomEdge = isNear(y, graph_y_offset + graph_height, 10);
+        bool isLeftEdge = isNear(x, graph_x_offset - curPointRadius ** 2, 10);
+        bool isRightEdge = isNear(x, graph_x_offset + graph_width + curPointRadius ** 2, 10);
+        bool isTopEdge = isNear(y, graph_y_offset - curPointRadius ** 2, 10);
+        bool isBottomEdge = isNear(y, graph_y_offset + graph_height + curPointRadius ** 2, 10);
 
         if (isLeftEdge && isTopEdge) {
             return CLICK_LOCATION::TLC;
@@ -461,14 +495,20 @@ class ScatterHistogram {
 
         bool matched = false;
 
-        for (int i = 0; i < histogramGroupArray.Length; i++) {
+        for (int i = 0; !matched && i < histogramGroupArray.Length; i++) {
             if (histogramGroupArray[i] !is null && histogramGroupArray[i].lower <= mouse_hover_x && histogramGroupArray[i].upper > mouse_hover_x) {
                 matched = true;
-                
             }
             if (matched && histogramGroupArray[i].DataPointArrays.Length > 0) {
-                @histGroup = histogramGroupArray[i];
-                break;
+                for (int j = 0; j < histogramGroupArray[i].DataPointArrays.Length; j++) {
+                    if (histogramGroupArray[i].DataPointArrays[j].visible) {
+                        @histGroup = histogramGroupArray[i];
+                        break;
+                    }
+                }
+            if (histGroup is null) {
+                matched = false;
+            }
             }
         }
 
@@ -486,11 +526,7 @@ class ScatterHistogram {
             }
         }
 
-        for (int i = 0; i < histogramGroupArray.Length; i++) {
-            for (int j = 0; j < histogramGroupArray[i].DataPointArrays.Length; j++) {
-                histogramGroupArray[i].DataPointArrays[j].decrease();
-            }
-        }
+
         if (selectedPoint is null) {
             return;
         }
@@ -509,6 +545,33 @@ class ScatterHistogram {
         nvg::Text(mouse_pos, text);
         nvg::Stroke();
         nvg::ClosePath();
+    }
+
+    // x scroll not implemented because i don't have a mouse that can do that 
+    // if that is a feature you care about please paypal me k thx bye
+    void OnMouseWheel(int y) {
+        float offset = (y < 0 ? -1 : 1) * Math::InvLerp(-720, 720, y) / 10;
+        vec2 mouse_pos = UI::GetMousePos();
+
+        if ((mouse_pos.x < graph_x_offset || mouse_pos.x > graph_width + graph_x_offset) || 
+            (mouse_pos.y < graph_y_offset || mouse_pos.y > graph_height + graph_y_offset)) {
+                return;
+            }
+
+        float xOffset = Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, mouse_pos.x);
+        float yOffset = Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, mouse_pos.y);
+        
+        
+        float xdiff = valueRange.y - valueRange.x;
+        float ydiff = valueRange.w - valueRange.z;
+
+        curPointRadius = curPointRadius + curPointRadius * (offset / 2);
+
+        valueRange.x = valueRange.x + xdiff * offset * xOffset;
+        valueRange.y = valueRange.y - xdiff * offset * (1 - xOffset);
+        valueRange.z = valueRange.z + ydiff * offset * (1 - yOffset);
+        valueRange.w = valueRange.w - ydiff * offset * yOffset;
+
     }
     
 }

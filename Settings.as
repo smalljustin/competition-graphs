@@ -25,6 +25,7 @@ vec4 BorderColor = vec4(1, 1, 1, 0.5);
 [Setting category="Display" name="Border Radius" drag min=0 max=50]
 float BorderRadius = 5.0f;
 
+[Setting category="Display" name="Padding" drag min=0 max=50]
 float Padding = .25f;
 
 [Setting category="General" name="Window Resize and Move Click Zone" min=3 max=20]
