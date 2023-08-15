@@ -89,6 +89,10 @@ class ScatterHistogram {
             startnew(CoroutineFunc(this.updateMap));
             updatePbTime();
         }
+        if (!is_totd) {
+            return;
+        }
+
         if (mapChallenge.updated) {
             startnew(CoroutineFunc(this.reloadHistogramData));
             mapChallenge.updated = false;
@@ -151,6 +155,9 @@ class ScatterHistogram {
 
     void updateMap() {
         active_map_totd_date = TOTD::GetDateMapWasTOTD_Async(getMapUid());
+        if (active_map_totd_date == "") {
+            is_totd = false;
+        }
         challenge_id = GetChallengeForDate(active_map_totd_date.SubStr(0, 10));
         if (challenge_id == 0) {
             is_totd = false;
