@@ -32,6 +32,7 @@ class ScatterHistogram {
     array<vec2> dataPointsToPrintLocations;
     
     bool shouldDecay = false;
+    int curRunStartTime = 0;
 
     void printDataPoints() {
         for (int i = 0; i < dataPointsToPrint.Length; i++) {
@@ -64,6 +65,10 @@ class ScatterHistogram {
     }
 
     void updatePbTime() {
+        int startTime = getPlayerStartTime();
+        if (startTime == curRunStartTime) {
+            return;
+        }
         auto app = cast<CTrackMania>(GetApp());
         auto network = cast<CTrackManiaNetwork>(app.Network);
         auto scoreMgr = network.ClientManiaAppPlayground.ScoreMgr;
@@ -75,6 +80,7 @@ class ScatterHistogram {
         userId.Value = uint(-1);
         }
         pbTime = scoreMgr.Map_GetRecord_v2(userId, active_map_uuid, "PersonalBest", "", "TimeAttack", "");
+        curRunStartTime = startTime;
     }
 
 
@@ -87,7 +93,6 @@ class ScatterHistogram {
             active_map_uuid = getMapUid();
             is_totd = true;
             startnew(CoroutineFunc(this.updateMap));
-            updatePbTime();
         }
         if (!is_totd) {
             return;
@@ -106,6 +111,8 @@ class ScatterHistogram {
         handleWindowResize();
         handleDivs();
         handlePointDecay();
+        updatePbTime();
+
     }
 
     void handlePointDecay() {
@@ -676,7 +683,33 @@ class ScatterHistogram {
         valueRange.w = valueRange.w - ydiff * offset * yOffset;
 
     }
+
+    CSmArenaClient@ getPlayground() {
+        return cast < CSmArenaClient > (GetApp().CurrentPlayground);
+    }
+
+    CSmPlayer@ getPlayer() {
+        auto playground = getPlayground();
+        if (playground!is null) {
+            if (playground.GameTerminals.Length > 0) {
+                CGameTerminal @ terminal = cast < CGameTerminal > (playground.GameTerminals[0]);
+                CSmPlayer @ player = cast < CSmPlayer > (terminal.GUIPlayer);
+                if (player!is null) {
+                    return player;
+                }   
+            }
+        }
+        return null;
+    }
     
+    int getPlayerStartTime() {
+        auto player = getPlayer();
+        if (player !is null) {
+            return player.StartTime;
+        }
+        return curRunStartTime;
+    }
+
 }
 
 enum CLICK_LOCATION {

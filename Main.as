@@ -76,14 +76,6 @@ void Main() {
   }
       
   TOTD::LoadTOTDs();
-
-  // print(GetDateForChallenge(0));
-  // print(GetDateForChallenge(1));
-  // print(GetDateForChallenge(2));
-}
-
-bool isMainQualifier(string testVal) {
-  return testVal.Contains("#1 - Challenge");
 }
 
 Json::Value@ getTimeMatchedChallenges(Json::Value@ val, uint64 time) {
@@ -96,14 +88,6 @@ Json::Value@ getTimeMatchedChallenges(Json::Value@ val, uint64 time) {
     }
   }
   return out_val;
-}
-
-array<string> getChallengeNames(Json::Value@ val) {
-  array<string> o; 
-  for (int i = 0; i < val.Length; i++) {
-    o.InsertLast(val[i]["name"]);
-  }
-  return o; 
 }
 
 int GetChallengeForDate(string date) {
@@ -168,25 +152,6 @@ int _GetChallengeForDate (int length, int offset, uint64 expectedStartTime, int 
   }
   return 0;
 }
-
-
-string GetDateForChallenge(int offset) {
-  // 5 platforms per COTD
-  // 3 COTD per day
-  // We're looking for the one with the substring "COTD YYYY-MM-DD #1 - Challenge"
-
-  Json::Value@ val = CotdApi().GetChallenges(20, offset);
-
-  IO::File new_file("C:/Users/jjsch/repos/competition-graphs/challengeOutput.json");
-  new_file.Open(IO::FileMode::Write);
-  new_file.Write(Json::Write(val));
-  new_file.Close();
-
-  string name = val[0]["name"];
-  return name.SubStr(5, 18);
-
-}
-
 
 void OnMouseButton(bool down, int button, int x, int y) {
   scatterHistogram.OnMouseButton(down, button, x, y);
