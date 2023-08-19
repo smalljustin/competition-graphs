@@ -134,6 +134,15 @@ class ChallengeData {
 
     void processDivs() {
         int active_div_number = 0;
+        float rf; 
+        if (focused) {
+            rf = FOCUSED_RECORD_FRAC;
+        } else {
+            rf = NONFOCUSED_RECORD_FRAC; 
+        }
+
+        float count_val = 1 - rf / 3;
+
         for (int i = 0; i < this.json_payload.Length; i++) {
             DataPoint @ dp = this.json_payload[i];
             if (dp.div != active_div_number) {
@@ -141,6 +150,9 @@ class ChallengeData {
                 this.divs[active_div_number].min_time = dp.time;
                 this.divs[active_div_number].max_time = dp.time;
             }
+            count_val += rf;
+            dp.visible = count_val < 1;
+            count_val -= 1;
             this.divs[active_div_number].max_time = dp.time;
             YieldByTime();
         }

@@ -17,8 +17,6 @@ class ScatterHistogram {
 
     int challenge_id; 
 
-    bool focused;
-
     float BorderWidth = 0;
 
     float curPointRadius = POINT_RADIUS;
@@ -35,6 +33,15 @@ class ScatterHistogram {
     int curRunStartTime = 0;
 
     bool reloadHistogramDataLock = false;
+    bool reloadHistogramRenderLock = false;
+
+    array<vec2> @rp_pos_arr = @array<vec2>();
+    array<float> @rp_size_arr = @array<float>();
+    array<vec4> @rp_color_arr = @array<vec4>();
+
+    int rpidxVal;
+
+    vec4 prev_v;
 
     void printDataPoints() {
         for (int i = 0; i < dataPointsToPrint.Length; i++) {
@@ -50,6 +57,7 @@ class ScatterHistogram {
         if (!WINDOW_MOVING) {
             return valueRange;
         }
+    
         vec2 current_loc = UI::GetMousePos();
         pending_v = valueRange;
         float click_x_offset = Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, click_loc.x);
@@ -62,6 +70,11 @@ class ScatterHistogram {
         float realized_y_offset = Math::Lerp(0, valueRange.w - valueRange.z, (current_y_offset - click_y_offset));
 
         pending_v -= vec4(realized_x_offset, realized_x_offset, -realized_y_offset, -realized_y_offset);
+
+        if (pending_v != prev_v) {
+            startnew(CoroutineFunc(this.reloadHistogramRender));
+            prev_v = pending_v;
+        }
 
         return pending_v;
     }
@@ -232,6 +245,8 @@ class ScatterHistogram {
         }
         precision = HIST_PRECISION_VALUE * 1000;
         histogramGroupArray.RemoveRange(0, histogramGroupArray.Length);
+
+        // Setting up underlying histroup array 
         int i;
         for (i = this.mapChallenge.json_payload[0].time; i < this.mapChallenge.json_payload[this.mapChallenge.json_payload.Length - 1].time ;) {
             YieldByTime();
@@ -241,6 +256,8 @@ class ScatterHistogram {
         }
 
         int cur_hga = 0;
+
+        // Add actual values to each bucket
         for (int i = 0; i < Math::Min(this.mapChallenge.json_payload.Length, MAX_RECORDS); i++) {
             float time = this.mapChallenge.json_payload[i].time;
             HistogramGroup@ hg = @histogramGroupArray[cur_hga];
@@ -325,7 +342,12 @@ class ScatterHistogram {
         startnew(CoroutineFunc(this.waitForUpdateAndReload));
     }
 
-    void renderHistogram() {
+    void reloadHistogramRender() {
+        if (this.reloadHistogramRenderLock) {
+            return;
+        }
+        this.reloadHistogramRenderLock = true;
+        print("Reloading histogram rander");
         if (this.mapChallenge.json_payload.IsEmpty()) {
             return;
         }
@@ -333,15 +355,11 @@ class ScatterHistogram {
             return;
         }
 
-        float rf; 
+        rp_pos_arr.RemoveRange(0, rp_pos_arr.Length);
+        rp_size_arr.RemoveRange(0, rp_size_arr.Length);
+        rp_color_arr.RemoveRange(0, rp_color_arr.Length);
 
-        if (focused) {
-            rf = FOCUSED_RECORD_FRAC;
-        } else {
-            rf = NONFOCUSED_RECORD_FRAC; 
-        }
-
-        float count_val = 1 - rf / 3;
+        rpidxVal = 0;
 
         vec4 vr = getValueRange();
 
@@ -351,12 +369,16 @@ class ScatterHistogram {
             if (activeArr is null || activeArr.Length == 0) {
                 continue;
             }
-            if ((focused && activeGroup.upper < vr.x) || activeGroup.lower > vr.y) {
+            if ((activeGroup.upper < vr.x) || activeGroup.lower > vr.y) {
                 continue;
             }
 
+            DataPoint @dp; 
             for (int j = 0; j < activeArr.Length; j++) {
-                float x_loc = activeArr[j].time;
+                YieldByTime();
+                @dp = @activeArr[j];
+                
+                float x_loc = dp.time;
                 float y_loc = j;
 
                 if (Math::IsInf(x_loc) || Math::IsNaN(x_loc)) {
@@ -371,18 +393,9 @@ class ScatterHistogram {
                     y_loc = 0;
                 }
 
-                count_val += rf;
-                if (count_val < 1) {
-                    continue;
-                }
-                count_val -= 1;
-
                 if (j < vr.z || j > vr.w) {
                     continue;
                 }
-
-                activeArr[j].visible = true;
-
                 vec4 color = HISTOGRAM_RUN_COLOR;
 
                 color.x += 0.05 * activeArr[j].div;
@@ -392,34 +405,42 @@ class ScatterHistogram {
                 color.x %= 1;
                 color.y %= 1;
                 color.z %= 1;
-                
-                if (activeArr[j].clicked) {
-                    nvg::BeginPath();
-                    nvg::Circle(
-                        TransformToViewBounds(ClampVec2(vec2(x_loc, y_loc), vr), min, max),
-                        curPointRadius + 2
-                    );
 
-                    nvg::StrokeColor(vec4(1, 1, 1, 1));
-                    nvg::StrokeWidth(curPointRadius ** 2);
-                    nvg::Stroke();
-                    nvg::ClosePath();
+                if (dp.clicked) {
+                    rp_pos_arr.InsertLast(TransformToViewBounds(ClampVec2(vec2(x_loc, y_loc), vr), min, max));
+                    rp_size_arr.InsertLast(curPointRadius + 2);
+                    rp_color_arr.InsertLast(vec4(1, 1, 1, 1));
                     renderDataPointText(activeArr[j], TransformToViewBounds(ClampVec2(vec2(x_loc, y_loc), getValueRange()), min, max));
                 }
 
-                nvg::BeginPath();
-                nvg::Circle(
-                    TransformToViewBounds(ClampVec2(vec2(x_loc, y_loc), vr), min, max),
-                    curPointRadius
-                );
-
-                nvg::StrokeColor(color);
-                nvg::StrokeWidth((curPointRadius + activeArr[j].focus) ** 2);
-                nvg::Stroke();
-                nvg::ClosePath();
-
+                rp_pos_arr.InsertLast(TransformToViewBounds(ClampVec2(vec2(x_loc, y_loc), vr), min, max));
+                rp_size_arr.InsertLast(curPointRadius + dp.focus);
+                rp_color_arr.InsertLast(color);
             }
         }
+        this.reloadHistogramRenderLock = false;
+    }
+
+    void renderHistogram() {
+        nvg::BeginPath();
+        if (rp_size_arr.IsEmpty()) {
+            return;
+        }
+        vec4 prevColor = rp_color_arr[0];
+        for (int i = 0; i < rp_pos_arr.Length; i++) {
+            if (rp_color_arr[i] != prevColor) {
+                nvg::StrokeColor(prevColor);
+                nvg::StrokeWidth(rp_size_arr[i]);
+                nvg::Stroke();
+                nvg::ClosePath();
+                nvg::BeginPath();
+                prevColor = rp_color_arr[i];
+
+            }
+            nvg::Circle(rp_pos_arr[i], rp_size_arr[i]);
+        }
+        nvg::Stroke();
+        nvg::ClosePath();
 
         if (pbTime != 0) {
             renderLine(pbTime, vec4(1, 1, 1, 1));
@@ -461,6 +482,7 @@ class ScatterHistogram {
     }
 
     void OnMouseButton(bool down, int button, int x, int y) {
+        startnew(CoroutineFunc(this.reloadHistogramRender));
         if (!down) {
             if (WINDOW_MOVING) {
                 valueRange = pending_v;
@@ -690,6 +712,8 @@ class ScatterHistogram {
         valueRange.y = valueRange.y - xdiff * offset * (1 - xOffset);
         valueRange.z = valueRange.z + ydiff * offset * (1 - yOffset);
         valueRange.w = valueRange.w - ydiff * offset * yOffset;
+
+        startnew(CoroutineFunc(this.reloadHistogramRender));
 
     }
 

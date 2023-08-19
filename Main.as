@@ -9,6 +9,7 @@ CotdApi @cotdApi;
 Debouncer debounce = Debouncer();
 float pbTime;
 uint64 lastFrameTime = Time::Now;
+bool focused;
 
 SQLite::Database@ db = SQLite::Database(":memory:");
 
