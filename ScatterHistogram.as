@@ -46,6 +46,9 @@ class ScatterHistogram {
 
     vec4 vr;
 
+    float BARHIST_OPACITY = 1;
+    float POINTHIST_OPACITY = 0;
+
     void printDataPoints() {
         for (int i = 0; i < dataPointsToPrint.Length; i++) {
             if (dataPointsToPrint[i] !is null)
@@ -108,6 +111,8 @@ class ScatterHistogram {
 
         vr = getValueRange();
 
+        setBarHistOpacity();
+
         renderBackground();
         renderHistogram();
         renderMouseHover();
@@ -120,6 +125,7 @@ class ScatterHistogram {
         handlePointDecay();
         updatePbTime();
         startnew(CoroutineFunc(this.handleClickedDecay));
+
     }
 
     void handlePointDecay() {
@@ -440,11 +446,106 @@ class ScatterHistogram {
         this.reloadHistogramRenderLock = false;
     }
 
+    void setBarHistOpacity() {
+        // Basically want to determine how points are overlapping 
+        // If there's at least one point of space in between each point, then render points at full brightness and bars at 0% brightness.
+        // If points are touching, render points at zero brightness and bars at 100% brightness.
+        // Mix it up in the middle. 
+
+        int vr_gap = vr.w - vr.z;
+
+        if (vr_gap == 0) {
+            return;
+        }
+
+        int pixels_gap = graph_height;
+        float space_per_vr_unit = pixels_gap / vr_gap;
+
+        float min_pr = MIN_PR_MULT * POINT_RADIUS;
+        float max_pr = MAX_PR_MULT * POINT_RADIUS;
+        
+        if (space_per_vr_unit > max_pr) {
+            POINTHIST_OPACITY = 1;
+            BARHIST_OPACITY = 0.1;
+        } else if ( space_per_vr_unit < min_pr) {
+            POINTHIST_OPACITY = 0;
+            BARHIST_OPACITY = 1;
+        } else {
+            float position = Math::InvLerp(min_pr, max_pr, space_per_vr_unit);
+            POINTHIST_OPACITY = position;
+            BARHIST_OPACITY = Math::Max(1 - position, 0.1);
+        }
+
+    }
+
+    void renderBarHistogram() {
+        HistogramGroup@ hg; 
+
+        float bottom_pos = -1;
+
+        for (int i = 0; i < histogramGroupArray.Length; i++) {
+            @hg = histogramGroupArray[i];
+            if (hg.upper < vr.x || hg.lower > vr.y) {
+                continue;
+            }
+
+            float lower = hg.lower; 
+
+            if (lower < vr.x) {
+                lower = vr.x;
+            }
+
+            if (hg.DataPointArrays.IsEmpty()) {
+                continue;
+            }
+
+            float start_height = Math::Min(hg.DataPointArrays.Length - 0.5, vr.w);
+
+            vec2 pos = TransformToViewBounds(vec2(lower, start_height), min, max);
+
+            if (pos.y > graph_height + graph_y_offset) {
+                continue;
+            }
+            float width = Math::InvLerp(0, vr.y - vr.x, hg.upper - lower);
+            float height = Math::InvLerp(0, float(vr.w - vr.z), float(start_height));
+            
+            vec2 size = vec2(
+                Math::Lerp(0, graph_width, width),
+                Math::Lerp(0, graph_height, height)
+            );
+
+            vec2 br_corner = size + pos;
+            br_corner.x = Math::Clamp(br_corner.x, graph_x_offset, graph_x_offset + graph_width);
+
+            if (bottom_pos == -1) {
+                br_corner.y = Math::Clamp(br_corner.y, graph_y_offset, graph_height + graph_y_offset);
+                bottom_pos = br_corner.y;
+            }
+             else {
+                br_corner.y = bottom_pos;
+            }
+
+            size = br_corner - pos;
+
+            nvg::BeginPath();
+            nvg::Rect(pos, size);
+            nvg::FillColor(applyOpacityToColor(rp_color_arr[hg.DataPointArrays[0].curRenderIdx], BARHIST_OPACITY));
+            nvg::Fill();
+            nvg::ClosePath();
+        }
+    }
+
     void renderHistogram() {
+        renderBarHistogram();
         nvg::BeginPath();
         if (rp_size_arr.IsEmpty()) {
             return;
         }
+
+        if (POINTHIST_OPACITY == 0) {
+            return;
+        }
+
         vec4 prevColor = rp_color_arr[0];
 
         float size_offset = POINT_RADIUS / (vr.w - vr.z);
@@ -774,4 +875,9 @@ enum CLICK_LOCATION {
     BRC,
     TRC,
     NOEDGE
+}
+
+vec4 applyOpacityToColor(vec4 c, float opacity) {
+    c.w *= opacity;
+    return c;
 }

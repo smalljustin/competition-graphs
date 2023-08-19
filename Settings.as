@@ -63,3 +63,9 @@ float NONFOCUSED_RECORD_FRAC = 0.5;
 
 [Setting drag min=5 max=50]
 uint64 MAX_FRAMETIME = 5;
+
+[Setting category="Histogram" name="Bar To Point Transition - Max Mult" drag min=2 max=8]
+float MAX_PR_MULT = 4;
+ 
+[Setting category="Histogram" name="Bar To Point Transition - Min Mult" drag min=2 max=8]
+float MIN_PR_MULT = 2;
