@@ -8,6 +8,7 @@ ScatterHistogram scatterHistogram;
 CotdApi @cotdApi;
 Debouncer debounce = Debouncer();
 float pbTime;
+uint64 lastFrameTime = Time::Now;
 
 SQLite::Database@ db = SQLite::Database(":memory:");
 
@@ -51,6 +52,7 @@ void DoRender() {
   if (shouldNotRender()) {
     return;
   }
+  lastFrameTime = Time::Now;
   auto app = GetApp();
   if (app.CurrentPlayground!is null && (app.CurrentPlayground.UIConfigs.Length > 0)) {
     if (app.CurrentPlayground.UIConfigs[0].UISequence == CGamePlaygroundUIConfig::EUISequence::Intro) {
@@ -60,7 +62,6 @@ void DoRender() {
     return;
   }
   scatterHistogram.render();
-  
 }
 
 void Main() {
@@ -178,4 +179,10 @@ uint64 ParseTime(const string &in inTime) {
 
 void OnMouseWheel(int _, int y) {
   scatterHistogram.OnMouseWheel(y);
+}
+
+void YieldByTime() {
+  if (Time::get_Now() - lastFrameTime > MAX_FRAMETIME) {
+    yield();
+  }
 }

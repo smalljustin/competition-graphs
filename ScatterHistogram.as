@@ -34,6 +34,8 @@ class ScatterHistogram {
     bool shouldDecay = false;
     int curRunStartTime = 0;
 
+    bool reloadHistogramDataLock = false;
+
     void printDataPoints() {
         for (int i = 0; i < dataPointsToPrint.Length; i++) {
             _renderDataPointText(dataPointsToPrint[i], dataPointsToPrintLocations[i]);
@@ -98,10 +100,6 @@ class ScatterHistogram {
             return;
         }
 
-        if (mapChallenge.updated) {
-            startnew(CoroutineFunc(this.reloadHistogramData));
-            mapChallenge.updated = false;
-        }
         renderBackground();
         renderHistogram();
 
@@ -138,8 +136,8 @@ class ScatterHistogram {
     }
 
     void handleDivs() {
-        for (int i = 0; i < mapChallenge.divs.Length; i++) {
-            mapChallenge.divs[i].decrease();
+        for (int i = 0; i < this.mapChallenge.divs.Length; i++) {
+            this.mapChallenge.divs[i].decrease();
         }
     }
 
@@ -171,16 +169,21 @@ class ScatterHistogram {
             return;
         }
         print("Map TOTD date: " + active_map_totd_date + ", challenge ID: " + challenge_id);
-        mapChallenge.changeMap(challenge_id, active_map_uuid);
-        while (mapChallenge.json_payload.Length == 0) {
+        this.mapChallenge.changeMap(challenge_id, active_map_uuid);
+        this.waitForUpdateAndReload();
+    }
+
+    void waitForUpdateAndReload() {
+        while (!this.mapChallenge.updateComplete) {
             yield();
         }
+        this.reloadHistogramData();
     }
 
     int getCutOffTimeAtDiv(int target_time, int precision) {
-        for (int i = 0; i < mapChallenge.divs.Length; i++) {
-            if (Math::Abs(mapChallenge.divs[i].max_time - target_time) < precision) {
-                return Math::Max(mapChallenge.divs[i].max_time, target_time);
+        for (int i = 0; i < this.mapChallenge.divs.Length; i++) {
+            if (Math::Abs(this.mapChallenge.divs[i].max_time - target_time) < precision) {
+                return Math::Max(this.mapChallenge.divs[i].max_time, target_time);
 
             }
         }
@@ -219,13 +222,19 @@ class ScatterHistogram {
     }
 
     void reloadHistogramData() {
-        if (this.mapChallenge.json_payload.Length == 0) {
+        if (this.reloadHistogramDataLock) {
+            return;
+        }
+        this.reloadHistogramDataLock = true;
+
+        if (this.mapChallenge.json_payload.Length == 0 || !this.mapChallenge.updateComplete) {
             return;
         }
         precision = HIST_PRECISION_VALUE * 1000;
         histogramGroupArray.RemoveRange(0, histogramGroupArray.Length);
         int i;
         for (i = this.mapChallenge.json_payload[0].time; i < this.mapChallenge.json_payload[this.mapChallenge.json_payload.Length - 1].time ;) {
+            YieldByTime();
             int res_upper = getCutOffTimeAtDiv(i + precision, precision);
             histogramGroupArray.InsertLast(HistogramGroup(i, res_upper));
             i = res_upper;
@@ -235,7 +244,6 @@ class ScatterHistogram {
         for (int i = 0; i < Math::Min(this.mapChallenge.json_payload.Length, MAX_RECORDS); i++) {
             float time = this.mapChallenge.json_payload[i].time;
             HistogramGroup@ hg = @histogramGroupArray[cur_hga];
-
             if (time >= hg.lower && time <= hg.upper) {
                 hg.DataPointArrays.InsertLast(@this.mapChallenge.json_payload[i]);
             } else {
@@ -250,14 +258,15 @@ class ScatterHistogram {
                     }
                 }
             }
+            YieldByTime();
         }
-
         reloadValueRange();
+        this.reloadHistogramDataLock = false;
     }
 
     void reloadValueRange() {
         curPointRadius = POINT_RADIUS;
-        valueRange = vec4(mapChallenge.json_payload[0].time - 100, mapChallenge.json_payload[(int(mapChallenge.json_payload.Length) * TARGET_DISPLAY_PERCENT)].time, -1, Math::Max(1, getMaxHistogramCount()));
+        valueRange = vec4(this.mapChallenge.json_payload[0].time - 100, this.mapChallenge.json_payload[(int(Math::Min(MAX_RECORDS, this.mapChallenge.json_payload.Length)) * TARGET_DISPLAY_PERCENT)].time, -1, Math::Max(1, getMaxHistogramCount()));
     }
     
     int getMaxHistogramCount() {
@@ -313,11 +322,11 @@ class ScatterHistogram {
 
     void OnSettingsChanged() {
         startnew(CoroutineFunc(this.mapChallenge.load_external));
-        startnew(CoroutineFunc(this.reloadHistogramData));
+        startnew(CoroutineFunc(this.waitForUpdateAndReload));
     }
 
     void renderHistogram() {
-        if (mapChallenge.json_payload.IsEmpty()) {
+        if (this.mapChallenge.json_payload.IsEmpty()) {
             return;
         }
         if (histogramGroupArray is null || histogramGroupArray.IsEmpty() || histogramGroupArray[0] is null) {
@@ -416,10 +425,10 @@ class ScatterHistogram {
             renderLine(pbTime, vec4(1, 1, 1, 1));
         }
 
-        renderLine(mapChallenge.divs[1].max_time, vec4(1, 1, 0, mapChallenge.divs[1].render_fade));
+        renderLine(this.mapChallenge.divs[1].max_time, vec4(1, 1, 0, this.mapChallenge.divs[1].render_fade));
 
-        for (int i = 2; i < mapChallenge.divs.Length; i++) {
-            Div@ d = mapChallenge.divs[i];
+        for (int i = 2; i < this.mapChallenge.divs.Length; i++) {
+            Div@ d = this.mapChallenge.divs[i];
             renderLine(d.min_time, vec4(1, 1, 0, d.render_fade));
             renderLine(d.max_time, vec4(1, 1, 0, d.render_fade));
         }
@@ -547,7 +556,7 @@ class ScatterHistogram {
     }
 
     void renderMouseHover() {
-        if (mapChallenge.json_payload.Length == 0) {
+        if (this.mapChallenge.json_payload.Length == 0) {
             return;
         }
 
@@ -618,7 +627,7 @@ class ScatterHistogram {
         }
 
         selectedPoint.increase(); 
-        mapChallenge.divs[selectedPoint.div].increase();
+        this.mapChallenge.divs[selectedPoint.div].increase();
         this.shouldDecay = true;
     }
 

@@ -40,7 +40,7 @@ float CLICK_ZONE = 10;
 [Setting category="Display" name="Point radius" min=0.1 max=10 drag]
 float POINT_RADIUS = 1.5;
 
-[Setting category="Histogram" name="Histogram precision value" drag min=0.001 max=0.3]
+[Setting category="Histogram" name="Histogram precision value" drag min=0.01 max=0.3]
 float HIST_PRECISION_VALUE = 0.02;
 
 [Setting category="General" name="Target fraction of runs to show" drag min=0.1 max=.8]
@@ -57,3 +57,6 @@ float FOCUSED_RECORD_FRAC = 1;
 
 [Setting category="General" name="Fraction of runs to show - Nonfocused" drag min=0.1 max=1]
 float NONFOCUSED_RECORD_FRAC = 0.5;
+
+[Setting drag min=5 max=50]
+uint64 MAX_FRAMETIME = 5;
