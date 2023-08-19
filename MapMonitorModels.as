@@ -160,6 +160,7 @@ class DataPoint {
     bool clicked;
     int curRenderIdx;
     int j;
+    string name;
 
     vec2 pos;
 
@@ -197,6 +198,16 @@ class DataPoint {
     void increase() {
         this.focus = Math::Min(POINT_RADIUS_HOVER, this.focus + 0.5);
     }
+    
+    void populateName() {
+        startnew(CoroutineFunc(this._populateName));
+    }
+
+    void _populateName() {
+        if (this.name == "") {
+            this.name = NadeoServices::GetDisplayNameAsync(this.player);
+        }
+    }
 }
 
 class Div {
@@ -225,5 +236,6 @@ class Div {
     string tostring() {
         return "min\t" + Text::Format("%d", this.min_time) + "\tmax\t" + Text::Format("%d", this.max_time);
     }
+
 
 }

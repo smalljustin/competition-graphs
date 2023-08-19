@@ -552,6 +552,7 @@ class ScatterHistogram {
                 }
 
                 activePoint.clicked = !activePoint.clicked;
+                activePoint.populateName();
                 shouldDecay = true;
             }
         } else {
@@ -622,6 +623,9 @@ class ScatterHistogram {
         float mouse_hover_x = Math::Lerp(vr.x, vr.y, Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, mouse_pos.x));
         float mouse_hover_y = Math::Lerp(vr.w, vr.z, Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, mouse_pos.y - curPointRadius));
 
+        if (mouse_hover_y < 0) {
+            return;
+        }
         HistogramGroup@ histGroup;
         // find the closest datapoint to the mouse cursor
 
@@ -636,6 +640,11 @@ class ScatterHistogram {
         if (histGroup is null || histGroup.DataPointArrays is null || histGroup.DataPointArrays.IsEmpty()) {
             return;
         }
+
+        if (mouse_hover_y > histGroup.DataPointArrays.Length + ((vr.w - vr.z) / 15)) {
+            return;
+        }
+
         int player_idx = Math::Clamp(mouse_hover_y, float(0), float(histGroup.DataPointArrays.Length - 1));
 
         DataPoint@ selectedPoint;
@@ -671,28 +680,34 @@ class ScatterHistogram {
         text += ", Div: " + tostring(selectedPoint.div);
         text += " , Time: " + Text::Format("%.3f", float(selectedPoint.time) / 1000);
 
+        renderText(text, pos);
+
         vec2 textSize = nvg::TextBounds(text);
 
-        vec2 textPos = pos; 
-        textPos.y -= textSize.y;
-        textPos -= vec2(Padding, Padding);
-        textSize += 2 * vec2(Padding, Padding);
+        pos.y += textSize.y * 1.15;
 
-        nvg::BeginPath();
-        nvg::RoundedRect(textPos, textSize, BorderRadius);
+        string playerText = "Player: " + selectedPoint.name;
 
+        renderText(playerText, pos);
+    }
+
+    void renderText(string text, vec2 textPos) {
         vec4 c = BackdropColor;
         c.w = 0.9;
+        vec2 size = nvg::TextBounds(text);
+        nvg::BeginPath();
+        nvg::RoundedRect(textPos, size, BorderRadius);
         nvg::FillColor(c);
         nvg::Fill();
         nvg::ClosePath();
 
+        textPos.y += size.y;
+
         nvg::BeginPath();
         nvg::FillColor(vec4(.9, .9, .9, 1));
-        nvg::Text(pos, text);
+        nvg::Text(textPos, text);
         nvg::Stroke();
         nvg::ClosePath();
-        
     }
 
     // x scroll not implemented because i don't have a mouse that can do that 

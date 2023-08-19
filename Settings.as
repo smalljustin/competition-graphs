@@ -38,7 +38,7 @@ float Padding = 2;
 float CLICK_ZONE = 10;
 
 [Setting category="Display" name="Point radius" min=0.1 max=10 drag]
-float POINT_RADIUS = 1.5;
+float POINT_RADIUS = 4;
 
 [Setting category="Display" name="Point radius: Hover" min=0.1 max=10 drag]
 float POINT_RADIUS_HOVER = 3;
