@@ -93,25 +93,49 @@ Json::Value@ getTimeMatchedChallenges(Json::Value@ val, uint64 time) {
 }
 
 int GetChallengeForDate(string date) {
+  // Crossplay start - 5/15/2023
+  // 3 COTD start - Aug 11 2021
+
+  // Also - keep in mind the max offset possible. 
+
   // 5 platforms per COTD
   // 3 COTD per day
   // Start at the day in front of the target date, then work backwards
 
   uint64 expectedStartTime = ParseTime(date) + (17 * 60 + 1) * 60;
+
+  uint64 consoleStartTime = ParseTime("2023-05-15") + (17 * 60 + 1) * 60;
+  uint64 threeCOTDStartTime = ParseTime("2021-08-11")+ (17 * 60 + 1) * 60;
   uint64 currentTime = ParseTime(Time::FormatString("20%y-%m-%d", Time::get_Stamp())) + (17 * 60 + 1) * 60;
 
-  uint64 diff = currentTime - expectedStartTime;
-  int dayDiff = diff / (60 * 60 * 24);
+  int currentDateChallenge = _GetChallengeForDate(100, 0, currentTime, 0);
+  print("currentDateChallenge: " + tostring(currentDateChallenge));
 
-  trace("Day diff: " + tostring(dayDiff));
-  int offset = 0;
-  if (dayDiff == 0) {
-    offset = 0;
-  } else {
-    offset = 15 * (dayDiff - 1);
+  int challengeGuessOffset = 0;
+  challengeGuessOffset += getExpectedChallenges(
+    Math::Max(consoleStartTime, expectedStartTime), currentTime, 15
+  );
+
+  if (expectedStartTime < consoleStartTime) {
+    challengeGuessOffset += getExpectedChallenges(
+      Math::Max(threeCOTDStartTime, expectedStartTime), consoleStartTime, 3
+    );
+
   }
 
-  return _GetChallengeForDate(100, offset, expectedStartTime, 0);
+  if (expectedStartTime < threeCOTDStartTime) {
+    challengeGuessOffset += getExpectedChallenges(
+      expectedStartTime, consoleStartTime, 1
+    );
+  }
+  
+  challengeGuessOffset = Math::Min(challengeGuessOffset, currentDateChallenge);
+
+  return _GetChallengeForDate(100, challengeGuessOffset, expectedStartTime, 0);
+}
+
+int getExpectedChallenges(uint64 start, uint64 end, int numPerDay) {
+  return (numPerDay) * ((end - start) / (60 * 60 * 24));
 }
 
 /* recursive internal method to handle trekking forwards/backwards */ 
@@ -125,13 +149,30 @@ int _GetChallengeForDate (int length, int offset, uint64 expectedStartTime, int 
   Json::Value@ challenges = CotdApi().GetChallenges(length, offset);
   Json::Value@ timeMatchedChallenges = getTimeMatchedChallenges(challenges, expectedStartTime);
 
-  if (challenges.Length == 0) {
+  if (challenges.Length == 0 && count != 0) {
     warn("No challenges found for this date! Returning 0.");
     return 0;
   }
+
+  if (challenges.Length == 0 && count == 0) {
+    print("No challenges found! We probably jumped too far forwards - going backwards.");
+    return _GetChallengeForDate(length, offset - length, expectedStartTime, count);
+
+  }
   if (timeMatchedChallenges.Length == 0) {
-    int maxTime = challenges[0]["startDate"];
-    int minTime = challenges[challenges.Length - 1]["startDate"];
+
+    int maxTime, minTime;
+
+    for (int i = 0; i < challenges.Length; i++) {
+      if (string(challenges[i]["name"]).Contains("Cup of the Day") || string(challenges[i]["name"]).Contains("COTD")) {
+        maxTime = challenges[i]["startDate"];
+      }
+    }
+    for (int i = challenges.Length - 1; i >= 0; i--) {
+      if (string(challenges[i]["name"]).Contains("Cup of the Day") || string(challenges[i]["name"]).Contains("COTD")) {
+        minTime = challenges[i]["startDate"];
+      }
+    }
 
     if (expectedStartTime < maxTime && expectedStartTime > minTime) {
       warn("No COTD found within time window!");
@@ -148,7 +189,8 @@ int _GetChallengeForDate (int length, int offset, uint64 expectedStartTime, int 
 
   for (int i = 0; i < timeMatchedChallenges.Length; i++) {
     string name = timeMatchedChallenges[i]["name"];
-    if (name.Contains("#1 - Challenge")) {
+    if (name.Contains("#1 - Challenge") || (name.Contains(" - Challenge") && !name.Contains("#"))) {
+      print(name);
       return timeMatchedChallenges[i]["id"];
     }
   }
