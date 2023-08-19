@@ -40,6 +40,9 @@ float CLICK_ZONE = 10;
 [Setting category="Display" name="Point radius" min=0.1 max=10 drag]
 float POINT_RADIUS = 1.5;
 
+[Setting category="Display" name="Point radius: Hover" min=0.1 max=10 drag]
+float POINT_RADIUS_HOVER = 3;
+
 [Setting category="Histogram" name="Histogram precision value" drag min=0.01 max=0.3]
 float HIST_PRECISION_VALUE = 0.02;
 

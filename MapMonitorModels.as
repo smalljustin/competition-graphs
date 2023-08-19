@@ -69,20 +69,17 @@ class ChallengeData {
     }
 
     void load_external() {
-        trace("External call: doing load.");
+        trace("External call: doing load.");            
+        if (locked) {
+            trace("Bouncing off load();");
+            return;
+        }
+        this.locked = true;
+        this.updateComplete = false;
         this.load(true);
     }
 
     void load(bool outermost) {
-        if (outermost) {
-            if (locked) {
-                trace("Bouncing off load();");
-                return;
-            }
-            this.locked = true;
-            this.updateComplete = false;
-        }
-        
         if (offset < MAX_RECORDS) {
             print("Loading offset " + tostring(offset) + " with length " + tostring(length));
             print("https://map-monitor.xk.io/api/challenges/" + this.challenge_id + "/records/maps/" + this.uid + "?length=" + tostring(this.length) + "&offset=" + tostring(this.offset));
@@ -141,8 +138,6 @@ class ChallengeData {
             rf = NONFOCUSED_RECORD_FRAC; 
         }
 
-        float count_val = 1 - rf / 3;
-
         for (int i = 0; i < this.json_payload.Length; i++) {
             DataPoint @ dp = this.json_payload[i];
             if (dp.div != active_div_number) {
@@ -150,9 +145,6 @@ class ChallengeData {
                 this.divs[active_div_number].min_time = dp.time;
                 this.divs[active_div_number].max_time = dp.time;
             }
-            count_val += rf;
-            dp.visible = count_val < 1;
-            count_val -= 1;
             this.divs[active_div_number].max_time = dp.time;
             YieldByTime();
         }
@@ -165,8 +157,11 @@ class DataPoint {
     int rank;
     int div;
     float focus;
-    bool visible;
     bool clicked;
+    int curRenderIdx;
+    int j;
+
+    vec2 pos;
 
     DataPoint() {}
 
@@ -177,6 +172,18 @@ class DataPoint {
         this.div = 1 + (rank / 64);
         this.focus = 0;
         this.clicked = false;
+        this.pos = vec2(0);
+    }
+
+    vec2 getPos() {
+        if (pos == vec2(0)) {
+            pos = vec2(time, j);
+        }
+        return pos;
+    }
+
+    void setPos(vec2 newPos) {
+        this.pos = newPos;
     }
 
     bool decrease() {
@@ -185,11 +192,10 @@ class DataPoint {
         } else {
             this.focus = Math::Max(0, this.focus - 0.1);
         }
-        this.visible = false;
         return true;
     }
     void increase() {
-        this.focus = Math::Min(1, this.focus + 0.5);
+        this.focus = Math::Min(POINT_RADIUS_HOVER, this.focus + 0.5);
     }
 }
 
