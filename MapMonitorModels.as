@@ -50,6 +50,7 @@ class ChallengeData {
     bool updateComplete;
 
     bool locked = false;
+    bool override_changemap = false;
 
     array < Div > divs(128);
 
@@ -64,8 +65,14 @@ class ChallengeData {
         this.uid = _map_uuid;
         this.challenge_id = challenge_id;
         this.json_payload.RemoveRange(0, this.json_payload.Length);
-        this.offset = 0;
-        startnew(CoroutineFunc(this.load_external));
+        this.updateComplete = false;
+        if (this.locked) {
+            this.override_changemap = true;
+            startnew(CoroutineFunc(this.load_override));
+        } else {
+            this.offset = 0;
+            startnew(CoroutineFunc(this.load_external));
+        }
     }
 
     void load_external() {
@@ -79,7 +86,26 @@ class ChallengeData {
         this.load(true);
     }
 
+    void load_override() {
+        trace("Changed map before done loading data; dealing with...that.");
+        while (this.locked) {
+            yield();
+        }
+        this.locked = true;
+        this.updateComplete = false;
+
+        this.override_changemap = false;
+        this.offset = 0;
+        this.load(true);
+    }
+
     void load(bool outermost) {
+        if (override_changemap) {
+            this.locked = false;
+            trace("Quitting from override_changemap");
+            return;
+        }
+
         if (offset < MAX_RECORDS) {
             print("Loading offset " + tostring(offset) + " with length " + tostring(length));
             print("https://map-monitor.xk.io/api/challenges/" + this.challenge_id + "/records/maps/" + this.uid + "?length=" + tostring(this.length) + "&offset=" + tostring(this.offset));
@@ -116,6 +142,7 @@ class ChallengeData {
         
         if (outermost) {
             processDivs();
+            print("Outermost! Boop xD");
             this.locked = false;
             this.updateComplete = true;
         }

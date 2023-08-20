@@ -108,8 +108,14 @@ int GetChallengeForDate(string date) {
   uint64 threeCOTDStartTime = ParseTime("2021-08-11")+ (17 * 60 + 1) * 60;
   uint64 currentTime = ParseTime(Time::FormatString("20%y-%m-%d", Time::get_Stamp())) + (17 * 60 + 1) * 60;
 
-  int currentDateChallenge = _GetChallengeForDate(100, 0, currentTime, 0);
-  print("currentDateChallenge: " + tostring(currentDateChallenge));
+  int previousDateChallenge = _GetChallengeForDate(100, 0, currentTime - (60 * 60 * 24), 0);
+
+  if (previousDateChallenge == -1) {
+    print("Couldn't resolve a proper previousDateChallenge! Using hardcoded value from 8/19/23 instead: ");
+    previousDateChallenge = 4469;
+  }
+
+  print("Previous date's challenge: " + tostring(previousDateChallenge));
 
   int challengeGuessOffset = 0;
   challengeGuessOffset += getExpectedChallenges(
@@ -129,7 +135,7 @@ int GetChallengeForDate(string date) {
     );
   }
   
-  challengeGuessOffset = Math::Min(challengeGuessOffset, currentDateChallenge);
+  challengeGuessOffset = Math::Min(challengeGuessOffset, previousDateChallenge);
 
   return _GetChallengeForDate(100, challengeGuessOffset, expectedStartTime, 0);
 }
@@ -143,7 +149,7 @@ int _GetChallengeForDate (int length, int offset, uint64 expectedStartTime, int 
   trace("_GetChallengeForDate: " + tostring(length) + "\t" + tostring(offset) + "\t" + tostring(expectedStartTime) + "\t" + tostring(count));
   if (count == 100) {
     warn("Failed to find a matching challenge!");
-    return 0;
+    return -1;
   }
 
   Json::Value@ challenges = CotdApi().GetChallenges(length, offset);
@@ -151,7 +157,7 @@ int _GetChallengeForDate (int length, int offset, uint64 expectedStartTime, int 
 
   if (challenges.Length == 0 && count != 0) {
     warn("No challenges found for this date! Returning 0.");
-    return 0;
+    return -1;
   }
 
   if (challenges.Length == 0 && count == 0) {
@@ -166,11 +172,13 @@ int _GetChallengeForDate (int length, int offset, uint64 expectedStartTime, int 
     for (int i = 0; i < challenges.Length; i++) {
       if (string(challenges[i]["name"]).Contains("Cup of the Day") || string(challenges[i]["name"]).Contains("COTD")) {
         maxTime = challenges[i]["startDate"];
+        break;
       }
     }
     for (int i = challenges.Length - 1; i >= 0; i--) {
       if (string(challenges[i]["name"]).Contains("Cup of the Day") || string(challenges[i]["name"]).Contains("COTD")) {
         minTime = challenges[i]["startDate"];
+        break;
       }
     }
 
@@ -184,7 +192,7 @@ int _GetChallengeForDate (int length, int offset, uint64 expectedStartTime, int 
         return _GetChallengeForDate(length, offset + length, expectedStartTime, count + 1);
       }
     }
-    return 0; 
+    return -1; 
   }
 
   for (int i = 0; i < timeMatchedChallenges.Length; i++) {
@@ -194,7 +202,7 @@ int _GetChallengeForDate (int length, int offset, uint64 expectedStartTime, int 
       return timeMatchedChallenges[i]["id"];
     }
   }
-  return 0;
+  return -1;
 }
 
 void OnMouseButton(bool down, int button, int x, int y) {

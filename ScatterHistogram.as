@@ -25,7 +25,6 @@ class ScatterHistogram {
 
     ScatterHistogram() {}
 
-    array<DataPoint@> dataPointsToPrint;
 
     bool shouldDecay = false;
     int curRunStartTime = 0;
@@ -41,13 +40,18 @@ class ScatterHistogram {
     array<bool> @rp_point_selected_arr = @array<bool>();
 
     array<DataPoint@> @dataPointsToDecay = @array<DataPoint@>(); 
+    array<DataPoint@> @dataPointsToPrint = @array<DataPoint@>();
+
 
     int rpidxVal;
 
     vec4 vr;
 
     float BARHIST_OPACITY = 1;
-    float POINTHIST_OPACITY = 0;
+    float POINTHIST_OPACITY = 0; 
+
+    float size_offset = 0;
+
 
     void printDataPoints() {
         for (int i = 0; i < dataPointsToPrint.Length; i++) {
@@ -94,6 +98,16 @@ class ScatterHistogram {
         curRunStartTime = startTime;
     }
 
+    void removeDataPointFromDataPointsToPrint(DataPoint@ dp) {
+        for (int i = 0; i < this.dataPointsToPrint.Length; i++) {
+            if (this.dataPointsToPrint[i] is dp) {
+                @this.dataPointsToPrint[i] = null;
+            }
+            rp_fill_color_arr[dp.curRenderIdx] = 0;
+            dp.clicked = false;
+        }
+    }
+
 
     void render() {
         float padding = 0;
@@ -116,7 +130,7 @@ class ScatterHistogram {
         renderBackground();
         renderHistogram();
         renderMouseHover();
-
+        renderDivs();
         printDataPoints();
         
         handleWindowMoving();
@@ -197,7 +211,18 @@ class ScatterHistogram {
             return;
         }
         print("Map TOTD date: " + active_map_totd_date + ", challenge ID: " + challenge_id);
+
         this.mapChallenge.changeMap(challenge_id, active_map_uuid);
+
+        this.rp_pos_arr.RemoveRange(0, this.rp_pos_arr.Length - 1);
+        this.rp_size_arr.RemoveRange(0, this.rp_size_arr.Length - 1);
+        this.rp_size_offset_arr.RemoveRange(0, this.rp_size_offset_arr.Length - 1);
+        this.rp_color_arr.RemoveRange(0, this.rp_color_arr.Length - 1);
+        this.rp_fill_color_arr.RemoveRange(0, this.rp_fill_color_arr.Length - 1);
+        this.rp_point_selected_arr.RemoveRange(0, this.rp_point_selected_arr.Length - 1);
+        this.dataPointsToDecay.RemoveRange(0, this.dataPointsToDecay.Length - 1);
+        this.dataPointsToPrint.RemoveRange(0, this.dataPointsToPrint.Length - 1);
+        this.histogramGroupArray.RemoveRange(0, this.histogramGroupArray.Length);
         this.waitForUpdateAndReload();
     }
 
@@ -463,7 +488,7 @@ class ScatterHistogram {
 
         float min_pr = MIN_PR_MULT * POINT_RADIUS;
         float max_pr = MAX_PR_MULT * POINT_RADIUS;
-        
+
         if (space_per_vr_unit > max_pr) {
             POINTHIST_OPACITY = 1;
             BARHIST_OPACITY = 0.1;
@@ -472,9 +497,12 @@ class ScatterHistogram {
             BARHIST_OPACITY = 1;
         } else {
             float position = Math::InvLerp(min_pr, max_pr, space_per_vr_unit);
+
             POINTHIST_OPACITY = position;
             BARHIST_OPACITY = Math::Max(1 - position, 0.1);
         }
+
+
 
     }
 
@@ -483,8 +511,15 @@ class ScatterHistogram {
 
         float bottom_pos = -1;
 
+        if (rp_color_arr.IsEmpty()) {
+            return;
+        }
+
         for (int i = 0; i < histogramGroupArray.Length; i++) {
             @hg = histogramGroupArray[i];
+            if (hg.DataPointArrays.IsEmpty()) {
+                continue;
+            }
             if (hg.upper < vr.x || hg.lower > vr.y) {
                 continue;
             }
@@ -548,7 +583,6 @@ class ScatterHistogram {
 
         vec4 prevColor = rp_color_arr[0];
 
-        float size_offset = POINT_RADIUS / (vr.w - vr.z);
         for (int i = 0; i < rp_pos_arr.Length; i++) {
             vec2 pos = rp_pos_arr[i];
             if (!isInViewBounds(pos, vr)) {
@@ -557,7 +591,7 @@ class ScatterHistogram {
             pos = TransformToViewBounds(pos, min, max);
             vec4 color = (rp_fill_color_arr[i] != vec4(0) ? rp_fill_color_arr[i] : rp_color_arr[i]);
             if (color != prevColor) {
-                nvg::StrokeColor(prevColor);
+                nvg::StrokeColor(applyOpacityToColor(prevColor, POINTHIST_OPACITY));
                 nvg::StrokeWidth(rp_size_arr[i]);
                 nvg::Stroke();
                 nvg::ClosePath();
@@ -576,13 +610,6 @@ class ScatterHistogram {
             renderLine(pbTime, vec4(1, 1, 1, 1));
         }
 
-        renderLine(this.mapChallenge.divs[1].max_time, vec4(1, 1, 0, this.mapChallenge.divs[1].render_fade));
-
-        for (int i = 2; i < this.mapChallenge.divs.Length; i++) {
-            Div@ d = this.mapChallenge.divs[i];
-            renderLine(d.min_time, vec4(1, 1, 0, d.render_fade));
-            renderLine(d.max_time, vec4(1, 1, 0, d.render_fade));
-        }
     }
 
     void renderLine(int time, vec4 color) {
@@ -596,6 +623,43 @@ class ScatterHistogram {
         nvg::StrokeColor(color);
         nvg::Stroke();
         nvg::ClosePath();
+    }
+
+    void renderDivs() {
+        // Handles rendering the text part of divs
+
+        for (int i = 0; i < this.mapChallenge.divs.Length; i++) {
+            Div@ div = @this.mapChallenge.divs[i];
+
+            array<string> expandedTextArr;
+            expandedTextArr.InsertLast("Division " + tostring(i));
+            expandedTextArr.InsertLast(Text::Format("%.3f", float(div.min_time) / 1000) + " to " + Text::Format("%.3f", float(div.max_time) / 1000));
+
+            int maxWidth = 0;
+            int maxHeight = 0;
+            for (int i = 0; i < expandedTextArr.Length; i++) {
+                vec2 size = nvg::TextBounds(expandedTextArr[i]);
+                maxWidth = Math::Max(maxWidth, size.x);
+                maxHeight = size.y;
+            }
+
+            float div_rl = Math::InvLerp(0, vr.y - vr.x, div.max_time - div.min_time);
+            float div_pl = Math::Lerp(0, graph_width, div_rl);
+
+            if (maxWidth <= div_pl) {
+                for (int i = 0; i < expandedTextArr.Length; i++) {
+                    vec2 textCanvasLocation = vec2(div.min_time, -1);
+                    renderText(expandedTextArr[i], TransformToViewBounds(textCanvasLocation, min, max) + vec2(0, maxHeight) * i * 1.5, false);
+                }
+
+            } else {
+                string minText = tostring(i);
+                vec2 textCanvasLocation = vec2(div.min_time, -1);
+                renderText(minText, TransformToViewBounds(textCanvasLocation, min, max), false);
+            }
+
+
+        }
     }
 
     vec2 ClampVec2(const vec2 & in val, const vec4 & in bounds) {
@@ -620,10 +684,7 @@ class ScatterHistogram {
         }
 
         if ((x > graph_x_offset - CLICK_ZONE && x < graph_x_offset + graph_width + CLICK_ZONE && y > graph_y_offset - CLICK_ZONE && y < graph_y_offset + graph_height + CLICK_ZONE)) {
-            if (button == 1) {
-                reloadValueRange();
-                return;
-            }
+
             // Check if we have a point active (i.e., at 100% focus):
 
             DataPoint@ activePoint;
@@ -634,6 +695,7 @@ class ScatterHistogram {
                     }
                 }
             }
+
             if (activePoint is null) {
                 // Then check if we're clicking an edge
                 CLICK_LOCATION clickLocType = getClickLocEnum(x, y);
@@ -644,6 +706,10 @@ class ScatterHistogram {
                 // Otherwise, pan the graph
                 WINDOW_MOVING = down;
                 click_loc = vec2(x, y);
+                if (button == 1) {
+                    reloadValueRange();
+                    return;
+                }
             } else {
                 if (activePoint.clicked) {
                     rp_fill_color_arr[activePoint.curRenderIdx] = vec4(0);
@@ -652,9 +718,20 @@ class ScatterHistogram {
                     dataPointsToPrint.InsertLast(activePoint);
                 }
 
-                activePoint.clicked = !activePoint.clicked;
-                activePoint.populateName();
-                shouldDecay = true;
+                if (button == 1) {
+                    for (int i = 0; i < dataPointsToPrint.Length; i++) {
+                        if (dataPointsToPrint[i] is null) {
+                            continue;
+                        }
+                        if (dataPointsToPrint[i].div == activePoint.div) {
+                            removeDataPointFromDataPointsToPrint(@dataPointsToPrint[i]);
+                        }
+                    }
+                } else {
+                    activePoint.clicked = !activePoint.clicked;
+                    activePoint.populateName();
+                    shouldDecay = true;
+                }
             }
         } else {
             focused = false;
@@ -667,10 +744,10 @@ class ScatterHistogram {
             return CLICK_LOCATION::NOEDGE;
         }
 
-        bool isLeftEdge = isNear(x, graph_x_offset - curPointRadius ** 2, CLICK_ZONE);
-        bool isRightEdge = isNear(x, graph_x_offset + graph_width + curPointRadius ** 2, CLICK_ZONE);
-        bool isTopEdge = isNear(y, graph_y_offset - curPointRadius ** 2, CLICK_ZONE);
-        bool isBottomEdge = isNear(y, graph_y_offset + graph_height + curPointRadius ** 2, CLICK_ZONE);
+        bool isLeftEdge = isNear(x, graph_x_offset - curPointRadius + size_offset, CLICK_ZONE);
+        bool isRightEdge = isNear(x, graph_x_offset + graph_width + curPointRadius + size_offset, CLICK_ZONE);
+        bool isTopEdge = isNear(y, graph_y_offset - curPointRadius + size_offset, CLICK_ZONE);
+        bool isBottomEdge = isNear(y, graph_y_offset + graph_height + curPointRadius + size_offset, CLICK_ZONE);
 
         if (isLeftEdge && isTopEdge) {
             return CLICK_LOCATION::TLC;
@@ -742,7 +819,7 @@ class ScatterHistogram {
             return;
         }
 
-        if (mouse_hover_y > histGroup.DataPointArrays.Length + ((vr.w - vr.z) / 15)) {
+        if (mouse_hover_y > histGroup.DataPointArrays.Length) {
             return;
         }
 
@@ -776,12 +853,16 @@ class ScatterHistogram {
             return;
         }
         pos = TransformToViewBounds(pos, min, max);
-        pos.y -= curPointRadius * 2;
         string text = "Rank: " + Text::Format("%d", selectedPoint.rank);
         text += ", Div: " + tostring(selectedPoint.div);
         text += " , Time: " + Text::Format("%.3f", float(selectedPoint.time) / 1000);
 
-        renderText(text, pos);
+        vec2 ts = nvg::TextBounds(text);
+
+        pos.y -= ts.y * 2.5;
+        pos.x += ts.y;
+
+        renderText(text, pos, true);
 
         vec2 textSize = nvg::TextBounds(text);
 
@@ -789,19 +870,29 @@ class ScatterHistogram {
 
         string playerText = "Player: " + selectedPoint.name;
 
-        renderText(playerText, pos);
+        renderText(playerText, pos, true);
     }
 
-    void renderText(string text, vec2 textPos) {
+    void renderText(string text, vec2 textPos, bool background) {
         vec4 c = BackdropColor;
         c.w = 0.9;
         vec2 size = nvg::TextBounds(text);
-        nvg::BeginPath();
-        nvg::RoundedRect(textPos, size, BorderRadius);
-        nvg::FillColor(c);
-        nvg::Fill();
-        nvg::ClosePath();
 
+        if (!isInViewBounds(textPos + size, vec4(graph_x_offset, graph_x_offset + graph_width, graph_y_offset, graph_y_offset + graph_height))) {
+            return;
+        }
+
+        if (!isInViewBounds(textPos, vec4(graph_x_offset, graph_x_offset + graph_width, graph_y_offset, graph_y_offset + graph_height))) {
+            return;
+        }
+
+        if (background) {
+            nvg::BeginPath();
+            nvg::RoundedRect(textPos, size, BorderRadius);
+            nvg::FillColor(c);
+            nvg::Fill();
+            nvg::ClosePath();
+        }
         textPos.y += size.y;
 
         nvg::BeginPath();
@@ -810,6 +901,8 @@ class ScatterHistogram {
         nvg::Stroke();
         nvg::ClosePath();
     }
+
+
 
     // x scroll not implemented because i don't have a mouse that can do that 
     // if that is a feature you care about please paypal me k thx bye
@@ -835,6 +928,8 @@ class ScatterHistogram {
         valueRange.y = valueRange.y - xdiff * offset * (1 - xOffset);
         valueRange.z = valueRange.z + ydiff * offset * (1 - yOffset);
         valueRange.w = valueRange.w - ydiff * offset * yOffset;
+
+        size_offset = POINT_RADIUS / (valueRange.w - valueRange.z);
     }
 
     CSmArenaClient@ getPlayground() {
