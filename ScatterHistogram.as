@@ -50,11 +50,12 @@ class ScatterHistogram {
     float BARHIST_OPACITY = 1;
     float POINTHIST_OPACITY = 0; 
 
-    float size_offset = 0;
+    float size_offset = 1;
+    
 
 
     void printDataPoints() {
-        for (int i = 0; i < dataPointsToPrint.Length; i++) {
+        for (uint i = 0; i < dataPointsToPrint.Length; i++) {
             if (dataPointsToPrint[i] !is null)
                 renderDataPointText(dataPointsToPrint[i]);
         }
@@ -66,11 +67,11 @@ class ScatterHistogram {
             return valueRange;
         }
         vec2 current_loc = UI::GetMousePos();
-        float click_x_offset = Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, click_loc.x);
-        float click_y_offset = Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, click_loc.y);
+        float click_x_offset = Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, int(click_loc.x));
+        float click_y_offset = Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, int(click_loc.y));
 
-        float current_x_offset = Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, current_loc.x);
-        float current_y_offset = Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, current_loc.y);
+        float current_x_offset = Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, int(current_loc.x));
+        float current_y_offset = Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, int(current_loc.y));
 
         float realized_x_offset = Math::Lerp(0, valueRange.y - valueRange.x, (current_x_offset - click_x_offset));
         float realized_y_offset = Math::Lerp(0, valueRange.w - valueRange.z, (current_y_offset - click_y_offset));
@@ -99,7 +100,7 @@ class ScatterHistogram {
     }
 
     void removeDataPointFromDataPointsToPrint(DataPoint@ dp) {
-        for (int i = 0; i < this.dataPointsToPrint.Length; i++) {
+        for (uint i = 0; i < this.dataPointsToPrint.Length; i++) {
             if (this.dataPointsToPrint[i] is dp) {
                 @this.dataPointsToPrint[i] = null;
             }
@@ -110,7 +111,6 @@ class ScatterHistogram {
 
 
     void render() {
-        float padding = 0;
         min = vec2(curPointRadius, graph_height - curPointRadius);
         max = vec2(graph_width - curPointRadius, curPointRadius);
 
@@ -143,7 +143,7 @@ class ScatterHistogram {
     }
 
     void handlePointDecay() {
-        for (int i = 0; i < dataPointsToDecay.Length; i++) {
+        for (uint i = 0; i < dataPointsToDecay.Length; i++) {
             if (dataPointsToDecay[i] is null) {
                 continue;
             }
@@ -227,11 +227,16 @@ class ScatterHistogram {
     }
 
     void waitForUpdateAndReload() {
+        print("Waiting for mapChallenge.updateComplete;");
         while (!this.mapChallenge.updateComplete) {
             yield();
         }
+        print("Reloading histogram data.");
         this.reloadHistogramData();
+        print("Reloading histogram render.");
         this.reloadHistogramRender();
+        print("waitForUpdateAndReload completed.");
+        size_offset = POINT_RADIUS / (vr.w - vr.z);
     }
 
     int getCutOffTimeAtDiv(int target_time, int precision) {
@@ -280,18 +285,17 @@ class ScatterHistogram {
             return;
         }
         this.reloadHistogramDataLock = true;
-        print("Reloading histogram data...");
 
         if (this.mapChallenge.json_payload.Length == 0 || !this.mapChallenge.updateComplete) {
             return;
         }
-        precision = HIST_PRECISION_VALUE * 1000;
+        float bucket_size = calcHistBucketSize(this.mapChallenge.json_payload);
         histogramGroupArray.RemoveRange(0, histogramGroupArray.Length);
 
         int i;
         for (i = this.mapChallenge.json_payload[0].time; i < this.mapChallenge.json_payload[this.mapChallenge.json_payload.Length - 1].time ;) {
             YieldByTime();
-            int res_upper = getCutOffTimeAtDiv(i + precision, precision);
+            int res_upper = getCutOffTimeAtDiv(i + bucket_size, bucket_size);
             histogramGroupArray.InsertLast(HistogramGroup(i, res_upper));
             i = res_upper;
         }
@@ -319,9 +323,27 @@ class ScatterHistogram {
             YieldByTime();
         }
         reloadValueRange();
-        startnew(CoroutineFunc(this.cleanPointDecay));
+        this.cleanPointDecay();
         this.reloadHistogramDataLock = false;
         print("Histogram data reloaded.");
+    }
+
+    float calcHistBucketSize(array<DataPoint@>@ dpArr) {
+            // Step 2: Calculate percentiles
+        int totalCount = dpArr.Length;
+        int buckets = totalCount / Math::Max(POINTS_PER_BUCKET, 10);
+
+        int lowerIdx = totalCount * 0.25;
+        int upperIdx = totalCount * 0.75;
+        
+        float lowerValue = dpArr[lowerIdx].time;
+        float upperValue = dpArr[upperIdx].time;
+
+        // Step 3: Calculate the bucket size
+        float range = upperValue - lowerValue;
+        float bucketSize = range / buckets;
+
+        return bucketSize;
     }
 
     void reloadValueRange() {
@@ -399,7 +421,6 @@ class ScatterHistogram {
             return;
         }
         this.reloadHistogramRenderLock = true;
-        print("Reloading histogram rander");
         vr = getValueRange();
         if (this.mapChallenge.json_payload.IsEmpty()) {
             return;
@@ -469,6 +490,7 @@ class ScatterHistogram {
             }
         }
         this.reloadHistogramRenderLock = false;
+        this.setBarHistOpacity();
     }
 
     void setBarHistOpacity() {
@@ -517,9 +539,16 @@ class ScatterHistogram {
 
         for (int i = 0; i < histogramGroupArray.Length; i++) {
             @hg = histogramGroupArray[i];
+
             if (hg.DataPointArrays.IsEmpty()) {
                 continue;
             }
+
+            if (hg.DataPointArrays[0].curRenderIdx >= rp_color_arr.Length) {
+                // i love concurrency bugs
+                continue;
+            }
+
             if (hg.upper < vr.x || hg.lower > vr.y) {
                 continue;
             }
@@ -570,9 +599,22 @@ class ScatterHistogram {
         }
     }
 
+    void renderPbLine() {
+        if (!RENDER_PB_LINE) {
+            return;
+        }
+
+        if (pbTime != 0) {
+            renderLine(pbTime, applyOpacityToColor(
+                vec4(1, 1, 1, 1),
+                Math::Max(0.1, POINTHIST_OPACITY)
+            ));
+        }
+    }
+
     void renderHistogram() {
         renderBarHistogram();
-        nvg::BeginPath();
+        renderPbLine();
         if (rp_size_arr.IsEmpty()) {
             return;
         }
@@ -583,6 +625,7 @@ class ScatterHistogram {
 
         vec4 prevColor = rp_color_arr[0];
 
+        nvg::BeginPath();
         for (int i = 0; i < rp_pos_arr.Length; i++) {
             vec2 pos = rp_pos_arr[i];
             if (!isInViewBounds(pos, vr)) {
@@ -606,10 +649,6 @@ class ScatterHistogram {
         nvg::Stroke();
         nvg::ClosePath();
 
-        if (pbTime != 0) {
-            renderLine(pbTime, vec4(1, 1, 1, 1));
-        }
-
     }
 
     void renderLine(int time, vec4 color) {
@@ -631,22 +670,19 @@ class ScatterHistogram {
         for (int i = 0; i < this.mapChallenge.divs.Length; i++) {
             Div@ div = @this.mapChallenge.divs[i];
 
-            array<string> expandedTextArr;
-            expandedTextArr.InsertLast("Division " + tostring(i));
-            expandedTextArr.InsertLast(Text::Format("%.3f", float(div.min_time) / 1000) + " to " + Text::Format("%.3f", float(div.max_time) / 1000));
-
-            int maxWidth = 0;
-            int maxHeight = 0;
-            for (int i = 0; i < expandedTextArr.Length; i++) {
-                vec2 size = nvg::TextBounds(expandedTextArr[i]);
-                maxWidth = Math::Max(maxWidth, size.x);
-                maxHeight = size.y;
+            if (div.min_time < vr.x || div.max_time > vr.y) {
+                continue;
             }
 
+            int maxWidth = 125;
+            int maxHeight = 12;
             float div_rl = Math::InvLerp(0, vr.y - vr.x, div.max_time - div.min_time);
             float div_pl = Math::Lerp(0, graph_width, div_rl);
 
             if (maxWidth <= div_pl) {
+                array<string> expandedTextArr;
+                expandedTextArr.InsertLast("Division " + tostring(i));
+                expandedTextArr.InsertLast(Text::Format("%.3f", float(div.min_time) / 1000) + " to " + Text::Format("%.3f", float(div.max_time) / 1000));
                 for (int i = 0; i < expandedTextArr.Length; i++) {
                     vec2 textCanvasLocation = vec2(div.min_time, -1);
                     renderText(expandedTextArr[i], TransformToViewBounds(textCanvasLocation, min, max) + vec2(0, maxHeight) * i * 1.5, false);
@@ -654,11 +690,14 @@ class ScatterHistogram {
 
             } else {
                 string minText = tostring(i);
-                vec2 textCanvasLocation = vec2(div.min_time, -1);
-                renderText(minText, TransformToViewBounds(textCanvasLocation, min, max), false);
+
+                if (30 > div_pl) {
+                    continue;
+                } else {
+                    vec2 textCanvasLocation = vec2(div.min_time, -1);
+                    renderText(minText, TransformToViewBounds(textCanvasLocation, min, max), false);
+                }
             }
-
-
         }
     }
 
@@ -683,13 +722,20 @@ class ScatterHistogram {
             return;
         }
 
+        // Check if we're clicking an edge
+        CLICK_LOCATION clickLocType = getClickLocEnum(x, y);
+        if (clickLocType != CLICK_LOCATION::NOEDGE) {
+            curClickLocEnum = clickLocType;
+            return;
+        }
+
         if ((x > graph_x_offset - CLICK_ZONE && x < graph_x_offset + graph_width + CLICK_ZONE && y > graph_y_offset - CLICK_ZONE && y < graph_y_offset + graph_height + CLICK_ZONE)) {
 
             // Check if we have a point active (i.e., at 100% focus):
 
             DataPoint@ activePoint;
-            for (int i = 0; i < histogramGroupArray.Length; i++) {
-                for (int j = 0; j < histogramGroupArray[i].DataPointArrays.Length; j++) {
+            for (uint i = 0; i < histogramGroupArray.Length; i++) {
+                for (uint j = 0; j < histogramGroupArray[i].DataPointArrays.Length; j++) {
                     if (histogramGroupArray[i].DataPointArrays[j].focus == POINT_RADIUS_HOVER - 0.1) {
                         @activePoint = histogramGroupArray[i].DataPointArrays[j];
                     }
@@ -697,12 +743,6 @@ class ScatterHistogram {
             }
 
             if (activePoint is null) {
-                // Then check if we're clicking an edge
-                CLICK_LOCATION clickLocType = getClickLocEnum(x, y);
-                if (clickLocType != CLICK_LOCATION::NOEDGE) {
-                    curClickLocEnum = clickLocType;
-                    return;
-                }
                 // Otherwise, pan the graph
                 WINDOW_MOVING = down;
                 click_loc = vec2(x, y);
@@ -719,7 +759,7 @@ class ScatterHistogram {
                 }
 
                 if (button == 1) {
-                    for (int i = 0; i < dataPointsToPrint.Length; i++) {
+                    for (uint i = 0; i < dataPointsToPrint.Length; i++) {
                         if (dataPointsToPrint[i] is null) {
                             continue;
                         }
@@ -734,6 +774,12 @@ class ScatterHistogram {
                 }
             }
         } else {
+            // right clicking anywhere outside the graph should remove all labels
+            if (button == 1) {
+                for (uint i = 0; i < dataPointsToPrint.Length; i++) {
+                    @dataPointsToPrint[i] = null;
+                }
+            }
             focused = false;
             shouldDecay = true;
         }
@@ -809,7 +855,7 @@ class ScatterHistogram {
 
         bool matched = false;
 
-        for (int i = 0; !matched && i < histogramGroupArray.Length; i++) {
+        for (uint i = 0; !matched && i < histogramGroupArray.Length; i++) {
             if (histogramGroupArray[i] !is null && histogramGroupArray[i].lower <= mouse_hover_x && histogramGroupArray[i].upper > mouse_hover_x) {
                 @histGroup = histogramGroupArray[i];
             }
@@ -826,7 +872,7 @@ class ScatterHistogram {
         int player_idx = Math::Clamp(mouse_hover_y, float(0), float(histGroup.DataPointArrays.Length - 1));
 
         DataPoint@ selectedPoint;
-        for (int i = player_idx; i >= 0; i--) {
+        for (uint i = player_idx; i >= 0; i--) {
             @selectedPoint = histGroup.DataPointArrays[player_idx];
         }
         if (selectedPoint is null) {
@@ -835,6 +881,11 @@ class ScatterHistogram {
 
         selectedPoint.increase(); 
         this.mapChallenge.divs[selectedPoint.div].increase();
+
+
+        if (rp_size_offset_arr.Length <= selectedPoint.curRenderIdx) {
+            return;
+        }
 
         rp_size_offset_arr[selectedPoint.curRenderIdx] = selectedPoint.focus;
 

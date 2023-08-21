@@ -43,8 +43,8 @@ float POINT_RADIUS = 4;
 [Setting category="Display" name="Point radius: Hover" min=0.1 max=10 drag]
 float POINT_RADIUS_HOVER = 3;
 
-[Setting category="Histogram" name="Histogram precision value" drag min=0.01 max=0.3]
-float HIST_PRECISION_VALUE = 0.02;
+[Setting category="Histogram" name="Points per bucket" drag min=16 max=160]
+float POINTS_PER_BUCKET = 32;
 
 [Setting category="General" name="Target fraction of runs to show" drag min=0.1 max=.8]
 float TARGET_DISPLAY_PERCENT = 0.875;
@@ -69,3 +69,6 @@ float MAX_PR_MULT = 4;
  
 [Setting category="Histogram" name="Bar To Point Transition - Min Mult" drag min=2 max=8]
 float MIN_PR_MULT = 2;
+
+[Setting category="Histogram" name="Show PB line"]
+bool RENDER_PB_LINE = true;

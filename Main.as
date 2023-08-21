@@ -82,7 +82,7 @@ void Main() {
 
 Json::Value@ getTimeMatchedChallenges(Json::Value@ val, uint64 time) {
   Json::Value@ out_val = Json::Array();
-  for (int i = 0; i < val.Length; i++) {
+  for (uint i = 0; i < val.Length; i++) {
     int sd = val[i]["startDate"];
 
     if (Math::Abs(time - sd) <= (60 * 60 * 2) ) {
@@ -167,15 +167,15 @@ int _GetChallengeForDate (int length, int offset, uint64 expectedStartTime, int 
   }
   if (timeMatchedChallenges.Length == 0) {
 
-    int maxTime, minTime;
+    uint64 maxTime, minTime;
 
-    for (int i = 0; i < challenges.Length; i++) {
+    for (uint i = 0; i < challenges.Length; i++) {
       if (string(challenges[i]["name"]).Contains("Cup of the Day") || string(challenges[i]["name"]).Contains("COTD")) {
         maxTime = challenges[i]["startDate"];
         break;
       }
     }
-    for (int i = challenges.Length - 1; i >= 0; i--) {
+    for (uint i = challenges.Length - 1; i >= 0; i--) {
       if (string(challenges[i]["name"]).Contains("Cup of the Day") || string(challenges[i]["name"]).Contains("COTD")) {
         minTime = challenges[i]["startDate"];
         break;
@@ -195,7 +195,7 @@ int _GetChallengeForDate (int length, int offset, uint64 expectedStartTime, int 
     return -1; 
   }
 
-  for (int i = 0; i < timeMatchedChallenges.Length; i++) {
+  for (uint i = 0; i < timeMatchedChallenges.Length; i++) {
     string name = timeMatchedChallenges[i]["name"];
     if (name.Contains("#1 - Challenge") || (name.Contains(" - Challenge") && !name.Contains("#"))) {
       print(name);

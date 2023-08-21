@@ -52,7 +52,7 @@ class ChallengeData {
     bool locked = false;
     bool override_changemap = false;
 
-    array < Div > divs(128);
+    array < Div@ > @divs = array<Div@>();
 
     ChallengeData() {}
 
@@ -62,9 +62,16 @@ class ChallengeData {
     }
 
     void changeMap(int challenge_id, string _map_uuid) {
+        if (challenge_id == 0 || _map_uuid == "") {
+            return;
+        }
+
         this.uid = _map_uuid;
         this.challenge_id = challenge_id;
         this.json_payload.RemoveRange(0, this.json_payload.Length);
+        if (!this.divs.IsEmpty()) {
+            this.divs.RemoveRange(0, this.divs.Length);
+        }
         this.updateComplete = false;
         if (this.locked) {
             this.override_changemap = true;
@@ -76,9 +83,8 @@ class ChallengeData {
     }
 
     void load_external() {
-        trace("External call: doing load.");            
         if (locked) {
-            trace("Bouncing off load();");
+            trace("Bouncing off load(); locked.");
             return;
         }
         this.locked = true;
@@ -142,14 +148,13 @@ class ChallengeData {
         
         if (outermost) {
             processDivs();
-            print("Outermost! Boop xD");
             this.locked = false;
             this.updateComplete = true;
         }
 }
 
     int parseDataPoint(Json::Value @ obj) {
-        for (int i = 0; i < obj.Length; i++) {
+        for (uint i = 0; i < obj.Length; i++) {
             json_payload.InsertLast(DataPoint(obj[i]));
             YieldByTime();
         }
@@ -158,16 +163,14 @@ class ChallengeData {
 
     void processDivs() {
         int active_div_number = 0;
-        float rf; 
-        if (focused) {
-            rf = FOCUSED_RECORD_FRAC;
-        } else {
-            rf = NONFOCUSED_RECORD_FRAC; 
+        if (!this.divs.IsEmpty()) {
+            this.divs.RemoveRange(0, this.divs.Length - 1);
         }
-
-        for (int i = 0; i < this.json_payload.Length; i++) {
-            DataPoint @ dp = this.json_payload[i];
+        this.divs.InsertLast(Div());
+        for (uint i = 0; i < this.json_payload.Length; i++) {
+            DataPoint @ dp = @this.json_payload[i];
             if (dp.div != active_div_number) {
+                this.divs.InsertLast(Div());
                 active_div_number = dp.div;
                 this.divs[active_div_number].min_time = dp.time;
                 this.divs[active_div_number].max_time = dp.time;
@@ -175,6 +178,7 @@ class ChallengeData {
             this.divs[active_div_number].max_time = dp.time;
             YieldByTime();
         }
+        print(this.divs.Length);
     }
 }
 
