@@ -159,7 +159,7 @@ class ScatterHistogram {
 
     void cleanPointDecay() {
         array<DataPoint@> @newArr = array<DataPoint@>();
-        for (int i = 0; i < dataPointsToDecay.Length; i++) {
+        for (uint i = 0; i < dataPointsToDecay.Length; i++) {
             if (dataPointsToDecay[i] !is null) {
                 newArr.InsertLast(dataPointsToDecay[i]);
             }
@@ -169,7 +169,7 @@ class ScatterHistogram {
     }
 
     void handleClickedDecay() {
-        for (int i = 0; i < dataPointsToPrint.Length; i++) {
+        for (uint i = 0; i < dataPointsToPrint.Length; i++) {
             if (dataPointsToPrint[i] !is null && !dataPointsToPrint[i].clicked) {
                 @dataPointsToPrint[i] = null;
             }
@@ -178,7 +178,7 @@ class ScatterHistogram {
     }
 
     void handleDivs() {
-        for (int i = 0; i < this.mapChallenge.divs.Length; i++) {
+        for (uint i = 0; i < this.mapChallenge.divs.Length; i++) {
             this.mapChallenge.divs[i].decrease();
         }
     }
@@ -240,7 +240,7 @@ class ScatterHistogram {
     }
 
     int getCutOffTimeAtDiv(int target_time, int precision) {
-        for (int i = 0; i < this.mapChallenge.divs.Length; i++) {
+        for (uint i = 0; i < this.mapChallenge.divs.Length; i++) {
             if (Math::Abs(this.mapChallenge.divs[i].max_time - target_time) < precision) {
                 return Math::Max(this.mapChallenge.divs[i].max_time, target_time);
 
@@ -255,26 +255,28 @@ class ScatterHistogram {
         }
         
         vec2 mouse_pos = UI::GetMousePos();
+        int mpx = int(mouse_pos.x);
+        int mpy = int(mouse_pos.y);
         if (curClickLocEnum == CLICK_LOCATION::TLC ) {
-            graph_x_offset = mouse_pos.x;
-            graph_y_offset = mouse_pos.y;
+            graph_x_offset = mpx;
+            graph_y_offset = mpy;
             return;
         }
 
         if (curClickLocEnum == CLICK_LOCATION::LEFTEDGE) {
-            graph_x_offset = mouse_pos.x;
+            graph_x_offset = mpx;
         }
 
         if (curClickLocEnum == CLICK_LOCATION::TOPEDGE) {
-            graph_y_offset = mouse_pos.y;
+            graph_y_offset = mpy;
         }
 
         if (curClickLocEnum == CLICK_LOCATION::RIGHTEDGE || curClickLocEnum == CLICK_LOCATION::TRC || curClickLocEnum == CLICK_LOCATION::BRC) {
-            graph_width = mouse_pos.x - graph_x_offset;
+            graph_width = mpx - graph_x_offset;
         }
 
         if (curClickLocEnum == CLICK_LOCATION::BOTTOMEDGE || curClickLocEnum == CLICK_LOCATION::BLC || curClickLocEnum == CLICK_LOCATION::BRC) {
-            graph_height = mouse_pos.y - graph_y_offset;
+            graph_height = mpy - graph_y_offset;
         }
 
 
@@ -289,11 +291,10 @@ class ScatterHistogram {
         if (this.mapChallenge.json_payload.Length == 0 || !this.mapChallenge.updateComplete) {
             return;
         }
-        float bucket_size = calcHistBucketSize(this.mapChallenge.json_payload);
+        int bucket_size = calcHistBucketSize(this.mapChallenge.json_payload);
         histogramGroupArray.RemoveRange(0, histogramGroupArray.Length);
 
-        int i;
-        for (i = this.mapChallenge.json_payload[0].time; i < this.mapChallenge.json_payload[this.mapChallenge.json_payload.Length - 1].time ;) {
+        for (int i = this.mapChallenge.json_payload[0].time; i < this.mapChallenge.json_payload[this.mapChallenge.json_payload.Length - 1].time ;) {
             YieldByTime();
             int res_upper = getCutOffTimeAtDiv(i + bucket_size, bucket_size);
             histogramGroupArray.InsertLast(HistogramGroup(i, res_upper));
@@ -303,7 +304,7 @@ class ScatterHistogram {
         int cur_hga = 0;
 
         // Add actual values to each bucket
-        for (int i = 0; i < Math::Min(this.mapChallenge.json_payload.Length, MAX_RECORDS); i++) {
+        for (uint i = 0; i < Math::Min(this.mapChallenge.json_payload.Length, MAX_RECORDS); i++) {
             float time = this.mapChallenge.json_payload[i].time;
             HistogramGroup@ hg = @histogramGroupArray[cur_hga];
             if (time >= hg.lower && time <= hg.upper) {
@@ -328,7 +329,7 @@ class ScatterHistogram {
         print("Histogram data reloaded.");
     }
 
-    float calcHistBucketSize(array<DataPoint@>@ dpArr) {
+    int calcHistBucketSize(array<DataPoint@>@ dpArr) {
             // Step 2: Calculate percentiles
         int totalCount = dpArr.Length;
         int buckets = totalCount / Math::Max(POINTS_PER_BUCKET, 10);
@@ -341,7 +342,7 @@ class ScatterHistogram {
 
         // Step 3: Calculate the bucket size
         float range = upperValue - lowerValue;
-        float bucketSize = range / buckets;
+        int bucketSize = range / buckets;
 
         return bucketSize;
     }
@@ -353,7 +354,7 @@ class ScatterHistogram {
     
     int getMaxHistogramCount() {
         float m = 0; 
-        for (int i = 0; i < histogramGroupArray.Length; i++) {
+        for (uint i = 0; i < histogramGroupArray.Length; i++) {
             m = Math::Max(histogramGroupArray[i].DataPointArrays.Length, m);
         }
         return m;
@@ -379,7 +380,7 @@ class ScatterHistogram {
 
     int getMaxRank(array<DataPoint@> arr) {
         int max_run_id = -1;
-        for (int i = 0; i < arr.Length; i++) {
+        for (uint i = 0; i < arr.Length; i++) {
             max_run_id = Math::Max(max_run_id, arr[i].rank);
         }
         return max_run_id; 
@@ -387,7 +388,7 @@ class ScatterHistogram {
 
     int getMinRank(array<DataPoint@> arr) {
         int min_run_id = 10 ** 6;
-        for (int i = 0; i < arr.Length; i++) {
+        for (uint i = 0; i < arr.Length; i++) {
             min_run_id = Math::Min(min_run_id, arr[i].rank);
         }
         return min_run_id;
@@ -439,14 +440,14 @@ class ScatterHistogram {
         rpidxVal = 0;
 
 
-        for (int i = 0; i < histogramGroupArray.Length; i++) {
+        for (uint i = 0; i < histogramGroupArray.Length; i++) {
             HistogramGroup@ activeGroup = @histogramGroupArray[i];
             array<DataPoint@>@ activeArr = @activeGroup.DataPointArrays;
             if (activeArr is null || activeArr.Length == 0) {
                 continue;
             }
             DataPoint @dp; 
-            for (int j = 0; j < activeArr.Length; j++) {
+            for (uint j = 0; j < activeArr.Length; j++) {
                 YieldByTime();
                 @dp = @activeArr[j];
                 
@@ -537,7 +538,7 @@ class ScatterHistogram {
             return;
         }
 
-        for (int i = 0; i < histogramGroupArray.Length; i++) {
+        for (uint i = 0; i < histogramGroupArray.Length; i++) {
             @hg = histogramGroupArray[i];
 
             if (hg.DataPointArrays.IsEmpty()) {
@@ -626,7 +627,7 @@ class ScatterHistogram {
         vec4 prevColor = rp_color_arr[0];
 
         nvg::BeginPath();
-        for (int i = 0; i < rp_pos_arr.Length; i++) {
+        for (uint i = 0; i < rp_pos_arr.Length; i++) {
             vec2 pos = rp_pos_arr[i];
             if (!isInViewBounds(pos, vr)) {
                 continue;
@@ -667,7 +668,7 @@ class ScatterHistogram {
     void renderDivs() {
         // Handles rendering the text part of divs
 
-        for (int i = 0; i < this.mapChallenge.divs.Length; i++) {
+        for (uint i = 0; i < this.mapChallenge.divs.Length; i++) {
             Div@ div = @this.mapChallenge.divs[i];
 
             if (div.min_time < vr.x || div.max_time > vr.y) {
@@ -683,7 +684,7 @@ class ScatterHistogram {
                 array<string> expandedTextArr;
                 expandedTextArr.InsertLast("Division " + tostring(i));
                 expandedTextArr.InsertLast(Text::Format("%.3f", float(div.min_time) / 1000) + " to " + Text::Format("%.3f", float(div.max_time) / 1000));
-                for (int i = 0; i < expandedTextArr.Length; i++) {
+                for (uint i = 0; i < expandedTextArr.Length; i++) {
                     vec2 textCanvasLocation = vec2(div.min_time, -1);
                     renderText(expandedTextArr[i], TransformToViewBounds(textCanvasLocation, min, max) + vec2(0, maxHeight) * i * 1.5, false);
                 }
@@ -834,8 +835,9 @@ class ScatterHistogram {
 
         vec2 mouse_pos = UI::GetMousePos();
 
-        if (getClickLocEnum(mouse_pos.x, mouse_pos.y) != CLICK_LOCATION::NOEDGE) {
+        if (getClickLocEnum(int(mouse_pos.x), int(mouse_pos.y)) != CLICK_LOCATION::NOEDGE) {
             BorderWidth = Math::Min(BorderWidth + 0.5, CLICK_ZONE / 2);
+            return;
         } else {
             BorderWidth = Math::Max(BorderWidth - 0.5, 0);
         }
@@ -861,6 +863,7 @@ class ScatterHistogram {
             }
         }
 
+
         if (histGroup is null || histGroup.DataPointArrays is null || histGroup.DataPointArrays.IsEmpty()) {
             return;
         }
@@ -872,7 +875,7 @@ class ScatterHistogram {
         int player_idx = Math::Clamp(mouse_hover_y, float(0), float(histGroup.DataPointArrays.Length - 1));
 
         DataPoint@ selectedPoint;
-        for (uint i = player_idx; i >= 0; i--) {
+        for (int i = player_idx; i >= 0; i--) {
             @selectedPoint = histGroup.DataPointArrays[player_idx];
         }
         if (selectedPoint is null) {
@@ -881,7 +884,6 @@ class ScatterHistogram {
 
         selectedPoint.increase(); 
         this.mapChallenge.divs[selectedPoint.div].increase();
-
 
         if (rp_size_offset_arr.Length <= selectedPoint.curRenderIdx) {
             return;

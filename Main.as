@@ -192,7 +192,6 @@ int _GetChallengeForDate (int length, int offset, uint64 expectedStartTime, int 
         return _GetChallengeForDate(length, offset + length, expectedStartTime, count + 1);
       }
     }
-    return -1; 
   }
 
   for (uint i = 0; i < timeMatchedChallenges.Length; i++) {
