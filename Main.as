@@ -7,7 +7,7 @@ bool is_totd;
 ScatterHistogram scatterHistogram;
 CotdApi @cotdApi;
 Debouncer debounce = Debouncer();
-float pbTime;
+int pbTime;
 uint64 lastFrameTime = Time::Now;
 bool focused;
 
@@ -92,7 +92,7 @@ Json::Value@ getTimeMatchedChallenges(Json::Value@ val, uint64 time) {
   return out_val;
 }
 
-int GetChallengeForDate(string date) {
+int GetChallengeForDate(const string &in date) {
   // Crossplay start - 5/15/2023
   // 3 COTD start - Aug 11 2021
 

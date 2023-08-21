@@ -35,7 +35,7 @@ float BorderRadius = 5.0f;
 float Padding = 2;
 
 [Setting category="General" name="Window Resize and Move Click Zone" min=3 max=20]
-float CLICK_ZONE = 10;
+int CLICK_ZONE = 10;
 
 [Setting category="Display" name="Point radius" min=0.1 max=10 drag]
 float POINT_RADIUS = 4;
