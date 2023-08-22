@@ -214,14 +214,14 @@ class ScatterHistogram {
 
         this.mapChallenge.changeMap(challenge_id, active_map_uuid);
 
-        this.rp_pos_arr.RemoveRange(0, this.rp_pos_arr.Length - 1);
-        this.rp_size_arr.RemoveRange(0, this.rp_size_arr.Length - 1);
-        this.rp_size_offset_arr.RemoveRange(0, this.rp_size_offset_arr.Length - 1);
-        this.rp_color_arr.RemoveRange(0, this.rp_color_arr.Length - 1);
-        this.rp_fill_color_arr.RemoveRange(0, this.rp_fill_color_arr.Length - 1);
-        this.rp_point_selected_arr.RemoveRange(0, this.rp_point_selected_arr.Length - 1);
-        this.dataPointsToDecay.RemoveRange(0, this.dataPointsToDecay.Length - 1);
-        this.dataPointsToPrint.RemoveRange(0, this.dataPointsToPrint.Length - 1);
+        this.rp_pos_arr.RemoveRange(0, this.rp_pos_arr.Length);
+        this.rp_size_arr.RemoveRange(0, this.rp_size_arr.Length);
+        this.rp_size_offset_arr.RemoveRange(0, this.rp_size_offset_arr.Length);
+        this.rp_color_arr.RemoveRange(0, this.rp_color_arr.Length);
+        this.rp_fill_color_arr.RemoveRange(0, this.rp_fill_color_arr.Length);
+        this.rp_point_selected_arr.RemoveRange(0, this.rp_point_selected_arr.Length);
+        this.dataPointsToDecay.RemoveRange(0, this.dataPointsToDecay.Length);
+        this.dataPointsToPrint.RemoveRange(0, this.dataPointsToPrint.Length);
         this.histogramGroupArray.RemoveRange(0, this.histogramGroupArray.Length);
         this.waitForUpdateAndReload();
     }
@@ -295,7 +295,6 @@ class ScatterHistogram {
         }
         for (int i = 0; i < int_numdivs; i++) {
             histogramGroupArray.InsertLast(HistogramGroup(mt + dx * i, mt + dx * (i + 1)));
-            print(histogramGroupArray[histogramGroupArray.Length - 1].toString());
         }
         histogramGroupArray[histogramGroupArray.Length - 1].upper = div.max_time;
     }
@@ -893,12 +892,10 @@ class ScatterHistogram {
 
 
         if (histGroup is null || histGroup.DataPointArrays is null || histGroup.DataPointArrays.IsEmpty()) {
-            print(898);
             return;
         }
 
         if (int(mouse_hover_y) > int(histGroup.DataPointArrays.Length)) {
-            print(903);
             return;
         }
 
@@ -909,7 +906,6 @@ class ScatterHistogram {
             @selectedPoint = histGroup.DataPointArrays[player_idx];
         }
         if (selectedPoint is null) {
-            print(914);
             return;
         }
 

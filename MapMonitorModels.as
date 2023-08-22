@@ -164,7 +164,7 @@ class ChallengeData {
     void processDivs() {
         int active_div_number = 0;
         if (!this.divs.IsEmpty()) {
-            this.divs.RemoveRange(0, this.divs.Length - 1);
+            this.divs.RemoveRange(0, this.divs.Length);
         }
         this.divs.InsertLast(Div());
         for (uint i = 0; i < this.json_payload.Length; i++) {
@@ -176,16 +176,6 @@ class ChallengeData {
                 this.divs[active_div_number].max_time = dp.time;
             }
             this.divs[active_div_number].max_time = dp.time;
-        }
-        print(this.divs.Length);
-        
-        // this is a dirty motherfucking hack and i don't like it here
-        // but by fucking god it works 
-        for (int i = 1; i < this.divs.Length; i++) {
-            if (this.divs[i].min_time == 0) {
-                this.divs.RemoveAt(i);
-                break;
-            }
         }
     }
 }

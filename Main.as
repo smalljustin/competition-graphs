@@ -106,6 +106,8 @@ int GetChallengeForDate(const string &in date) {
 
   uint64 consoleStartTime = ParseTime("2023-05-15") + (17 * 60 + 1) * 60;
   uint64 threeCOTDStartTime = ParseTime("2021-08-11")+ (17 * 60 + 1) * 60;
+
+
   uint64 currentTime = ParseTime(Time::FormatString("20%y-%m-%d", Time::get_Stamp())) + (17 * 60 + 1) * 60;
 
   int previousDateChallenge = _GetChallengeForDate(100, 0, currentTime - (60 * 60 * 24), 0);
@@ -137,6 +139,8 @@ int GetChallengeForDate(const string &in date) {
   
   challengeGuessOffset = Math::Min(challengeGuessOffset, previousDateChallenge);
 
+  challengeGuessOffset = Math::Max(0, challengeGuessOffset - 15); // lazy offset instead of proper offset
+  
   return _GetChallengeForDate(100, challengeGuessOffset, expectedStartTime, 0);
 }
 

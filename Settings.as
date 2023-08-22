@@ -43,7 +43,7 @@ float POINT_RADIUS = 4;
 [Setting category="Display" name="Point radius: Hover" min=0.1 max=10 drag]
 float POINT_RADIUS_HOVER = 3;
 
-[Setting category="Histogram" name="Points per bucket" drag min=16 max=160]
+[Setting category="Histogram" name="Points per bucket" drag min=4 max=64]
 float POINTS_PER_BUCKET = 32;
 
 [Setting category="General" name="Target fraction of runs to show" drag min=0.1 max=.8]
