@@ -278,8 +278,37 @@ class ScatterHistogram {
         if (curClickLocEnum == CLICK_LOCATION::BOTTOMEDGE || curClickLocEnum == CLICK_LOCATION::BLC || curClickLocEnum == CLICK_LOCATION::BRC) {
             graph_height = mpy - graph_y_offset;
         }
+    }
 
+    void addHistogramGroupsForDiv(array<HistogramGroup@>@ histogramGroupArray, int divIdx, int targetBucketSize) {
+        Div@ div = @this.mapChallenge.divs[divIdx];
+        int mt = div.min_time;
+        int divGap = div.max_time - div.min_time;
+        float numdivs = float(divGap) / float(targetBucketSize);
+        float rem = numdivs % 1;
+        int int_numdivs = Math::Max(int(numdivs), 1);
+        int dx;
+        if (rem == 0) {
+            dx = targetBucketSize;
+        } else {
+            dx = targetBucketSize + targetBucketSize * (rem / float(int_numdivs)); 
+        }
+        for (int i = 0; i < int_numdivs; i++) {
+            histogramGroupArray.InsertLast(HistogramGroup(mt + dx * i, mt + dx * (i + 1)));
+            print(histogramGroupArray[histogramGroupArray.Length - 1].toString());
+        }
+        histogramGroupArray[histogramGroupArray.Length - 1].upper = div.max_time;
+    }
 
+    int getHistBucketSizeForDiv(int divIdx, int targetSize) {
+        Div@ div = this.mapChallenge.divs[divIdx];
+        int divGap = div.max_time - div.min_time;
+        int remainder = divGap % targetSize;
+        if (remainder == 0) {
+            return targetSize;
+        } else {
+            return targetSize + int((remainder / int(divGap / targetSize)));
+        }
     }
 
     void reloadHistogramData() {
@@ -291,18 +320,15 @@ class ScatterHistogram {
         if (this.mapChallenge.json_payload.Length == 0 || !this.mapChallenge.updateComplete) {
             return;
         }
-        int bucket_size = calcHistBucketSize(this.mapChallenge.json_payload);
+
         histogramGroupArray.RemoveRange(0, histogramGroupArray.Length);
 
-        for (int i = this.mapChallenge.json_payload[0].time; i < this.mapChallenge.json_payload[this.mapChallenge.json_payload.Length - 1].time ;) {
-            YieldByTime();
-            int res_upper = getCutOffTimeAtDiv(i + bucket_size, bucket_size);
-            histogramGroupArray.InsertLast(HistogramGroup(i, res_upper));
-            i = res_upper;
+        int bucket_size = calcHistBucketSize(this.mapChallenge.json_payload);
+
+        for (int i = 1; i < this.mapChallenge.divs.Length; i++) {
+            addHistogramGroupsForDiv(@histogramGroupArray, i, bucket_size);
         }
-
         uint cur_hga = 0;
-
         // Add actual values to each bucket
         for (uint i = 0; i < uint(Math::Min(this.mapChallenge.json_payload.Length, uint(MAX_RECORDS))); i++) {
             float time = this.mapChallenge.json_payload[i].time;
@@ -311,8 +337,6 @@ class ScatterHistogram {
                 hg.DataPointArrays.InsertLast(@this.mapChallenge.json_payload[i]);
             } else {
                 if (time < hg.lower) {
-                    print(time);
-                    print(hg.toString());
                     warn("Unexpected behavior! Report this to the dev. This error message will only confuse them, though."); 
                 } else {
                     if (cur_hga != histogramGroupArray.Length - 1) {
@@ -331,7 +355,7 @@ class ScatterHistogram {
 
     int calcHistBucketSize(array<DataPoint@>@ dpArr) {
             // Step 2: Calculate percentiles
-        int totalCount = dpArr.Length;
+        int totalCount = int(dpArr.Length) / 2;
         int buckets = int(totalCount / Math::Max(POINTS_PER_BUCKET, 10));
 
         int lowerIdx = int(totalCount * 0.25);
@@ -853,7 +877,6 @@ class ScatterHistogram {
 
         float mouse_hover_x = Math::Lerp(vr.x, vr.y, Math::InvLerp(graph_x_offset, graph_x_offset + graph_width, int(mouse_pos.x)));
         float mouse_hover_y = Math::Lerp(vr.w, vr.z, Math::InvLerp(graph_y_offset, graph_y_offset + graph_height, int(mouse_pos.y - curPointRadius)));
-
         if (mouse_hover_y < 0) {
             return;
         }
@@ -870,10 +893,12 @@ class ScatterHistogram {
 
 
         if (histGroup is null || histGroup.DataPointArrays is null || histGroup.DataPointArrays.IsEmpty()) {
+            print(898);
             return;
         }
 
         if (int(mouse_hover_y) > int(histGroup.DataPointArrays.Length)) {
+            print(903);
             return;
         }
 
@@ -884,6 +909,7 @@ class ScatterHistogram {
             @selectedPoint = histGroup.DataPointArrays[player_idx];
         }
         if (selectedPoint is null) {
+            print(914);
             return;
         }
 
@@ -987,7 +1013,9 @@ class ScatterHistogram {
         valueRange.z = valueRange.z + ydiff * offset * (1 - yOffset);
         valueRange.w = valueRange.w - ydiff * offset * yOffset;
 
-        size_offset = POINT_RADIUS / (valueRange.w - valueRange.z);
+        if (valueRange.w - valueRange.z > 0) {
+            size_offset = POINT_RADIUS / (valueRange.w - valueRange.z);
+        }
     }
 
     CSmArenaClient@ getPlayground() {

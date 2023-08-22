@@ -176,9 +176,17 @@ class ChallengeData {
                 this.divs[active_div_number].max_time = dp.time;
             }
             this.divs[active_div_number].max_time = dp.time;
-            YieldByTime();
         }
         print(this.divs.Length);
+        
+        // this is a dirty motherfucking hack and i don't like it here
+        // but by fucking god it works 
+        for (int i = 1; i < this.divs.Length; i++) {
+            if (this.divs[i].min_time == 0) {
+                this.divs.RemoveAt(i);
+                break;
+            }
+        }
     }
 }
 

@@ -1,13 +1,13 @@
 class HistogramGroup {
-    float lower;
-    float upper;
+    int lower;
+    int upper;
     int minRank, maxRank;
     array<DataPoint@>@ DataPointArrays = array<DataPoint@>();
 
     HistogramGroup() {
     }
 
-    HistogramGroup(float lower, float upper) {
+    HistogramGroup(int lower, int upper) {
         this.lower = lower;
         this.upper = upper;
         this.minRank = -1;
