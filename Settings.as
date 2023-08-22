@@ -44,7 +44,7 @@ float POINT_RADIUS = 4;
 float POINT_RADIUS_HOVER = 3;
 
 [Setting category="Histogram" name="Points per bucket" drag min=4 max=64]
-float POINTS_PER_BUCKET = 32;
+int POINTS_PER_BUCKET = 32;
 
 [Setting category="General" name="Target fraction of runs to show" drag min=0.1 max=.8]
 float TARGET_DISPLAY_PERCENT = 0.875;

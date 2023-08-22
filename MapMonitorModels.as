@@ -61,25 +61,21 @@ class ChallengeData {
         startnew(CoroutineFunc(this.load_external));
     }
 
-    void changeMap(int challenge_id, string _map_uuid) {
-        if (challenge_id == 0 || _map_uuid == "") {
-            return;
-        }
-
+    ChallengeData(string _map_uuid, int challenge_id) {
         this.uid = _map_uuid;
         this.challenge_id = challenge_id;
-        this.json_payload.RemoveRange(0, this.json_payload.Length);
-        if (!this.divs.IsEmpty()) {
-            this.divs.RemoveRange(0, this.divs.Length);
-        }
         this.updateComplete = false;
-        if (this.locked) {
-            this.override_changemap = true;
-            startnew(CoroutineFunc(this.load_override));
-        } else {
-            this.offset = 0;
-            startnew(CoroutineFunc(this.load_external));
-        }
+        this.offset = 0;
+        this.locked = true;
+        this.updateComplete = false;
+        this.load(true);
+    }
+
+    void terminate() {
+        print("Terminating map challenge data for map_uuid " + this.uid + ", challenge " + tostring(this.challenge_id));
+        this.json_payload.RemoveRange(0, this.json_payload.Length);
+        this.divs.RemoveRange(0, this.divs.Length);
+        this.override_changemap = true;
     }
 
     void load_external() {
@@ -92,21 +88,8 @@ class ChallengeData {
         this.load(true);
     }
 
-    void load_override() {
-        trace("Changed map before done loading data; dealing with...that.");
-        while (this.locked) {
-            yield();
-        }
-        this.locked = true;
-        this.updateComplete = false;
-
-        this.override_changemap = false;
-        this.offset = 0;
-        this.load(true);
-    }
-
     void load(bool outermost) {
-        if (override_changemap) {
+        if (override_changemap || this.uid != active_map_uuid) {
             this.locked = false;
             trace("Quitting from override_changemap");
             return;
@@ -147,8 +130,10 @@ class ChallengeData {
         }
         
         if (outermost) {
-            processDivs();
-            this.locked = false;
+            if (!override_changemap) {
+                processDivs();
+            }
+            this.locked = false;    
             this.updateComplete = true;
         }
 }

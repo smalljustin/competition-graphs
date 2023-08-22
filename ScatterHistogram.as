@@ -116,6 +116,9 @@ class ScatterHistogram {
 
         if (active_map_uuid != getMapUid()) {
             active_map_uuid = getMapUid();
+            if (active_map_uuid == "") {
+                this.mapChallenge.terminate();
+            }
             is_totd = true;
             startnew(CoroutineFunc(this.updateMap));
         }
@@ -143,16 +146,20 @@ class ScatterHistogram {
     }
 
     void handlePointDecay() {
-        for (uint i = 0; i < dataPointsToDecay.Length; i++) {
-            if (dataPointsToDecay[i] is null) {
+        if (this.dataPointsToDecay.IsEmpty()) {
+            return;
+        }
+
+        for (uint i = 0; i < this.dataPointsToDecay.Length; i++) {
+            if (this.dataPointsToDecay[i] is null) {
                 continue;
             }
-            if (dataPointsToDecay[i].decrease()) {
-                rp_size_offset_arr[dataPointsToDecay[i].curRenderIdx] = dataPointsToDecay[i].focus;
+            if (this.dataPointsToDecay[i].decrease()) {
+                rp_size_offset_arr[this.dataPointsToDecay[i].curRenderIdx] = this.dataPointsToDecay[i].focus;
                 continue;
             } else {
-                rp_point_selected_arr[dataPointsToDecay[i].curRenderIdx] = false;
-                @dataPointsToDecay[i] = null;
+                rp_point_selected_arr[this.dataPointsToDecay[i].curRenderIdx] = false;
+                @this.dataPointsToDecay[i] = null;
             }
         }
     }
@@ -212,8 +219,11 @@ class ScatterHistogram {
         }
         print("Map TOTD date: " + active_map_totd_date + ", challenge ID: " + challenge_id);
 
-        this.mapChallenge.changeMap(challenge_id, active_map_uuid);
+        if (this.mapChallenge !is null) {
+            this.mapChallenge.terminate();
+        }
 
+        this.mapChallenge = ChallengeData(active_map_uuid, challenge_id);
         this.rp_pos_arr.RemoveRange(0, this.rp_pos_arr.Length);
         this.rp_size_arr.RemoveRange(0, this.rp_size_arr.Length);
         this.rp_size_offset_arr.RemoveRange(0, this.rp_size_offset_arr.Length);
@@ -233,6 +243,8 @@ class ScatterHistogram {
         }
         print("Reloading histogram data.");
         this.reloadHistogramData();
+        print("Reloading value range.");
+        this.reloadValueRange();
         print("Reloading histogram render.");
         this.reloadHistogramRender();
         print("waitForUpdateAndReload completed.");
@@ -324,6 +336,10 @@ class ScatterHistogram {
 
         int bucket_size = calcHistBucketSize(this.mapChallenge.json_payload);
 
+        if (this.mapChallenge.divs.IsEmpty()) {
+            return;
+        }
+        
         for (int i = 1; i < this.mapChallenge.divs.Length; i++) {
             addHistogramGroupsForDiv(@histogramGroupArray, i, bucket_size);
         }
@@ -371,6 +387,9 @@ class ScatterHistogram {
     }
 
     void reloadValueRange() {
+        if (this.mapChallenge.json_payload.IsEmpty()) {
+            return;
+        }
         curPointRadius = POINT_RADIUS;
         valueRange = vec4(
             this.mapChallenge.json_payload[0].time - 100,
@@ -378,9 +397,14 @@ class ScatterHistogram {
             -1,
             Math::Max(1, getMaxHistogramCount())
         );
+        vr = valueRange;
     }
     
     int getMaxHistogramCount() {
+        if (this.histogramGroupArray.IsEmpty()) {
+            return 1;
+        }
+
         int m = 0; 
         for (uint i = 0; i < histogramGroupArray.Length; i++) {
             m = Math::Max(histogramGroupArray[i].DataPointArrays.Length, m);
@@ -528,7 +552,7 @@ class ScatterHistogram {
         // If points are touching, render points at zero brightness and bars at 100% brightness.
         // Mix it up in the middle. 
 
-        int vr_gap = int(vr.w - vr.z);
+        float vr_gap = vr.w - vr.z;
 
         if (vr_gap == 0) {
             return;
@@ -540,6 +564,8 @@ class ScatterHistogram {
         float min_pr = MIN_PR_MULT * POINT_RADIUS;
         float max_pr = MAX_PR_MULT * POINT_RADIUS;
 
+        float position = Math::InvLerp(min_pr, max_pr, space_per_vr_unit);
+
         if (space_per_vr_unit > max_pr) {
             POINTHIST_OPACITY = 1;
             BARHIST_OPACITY = 0.1;
@@ -547,8 +573,6 @@ class ScatterHistogram {
             POINTHIST_OPACITY = 0;
             BARHIST_OPACITY = 1;
         } else {
-            float position = Math::InvLerp(min_pr, max_pr, space_per_vr_unit);
-
             POINTHIST_OPACITY = position;
             BARHIST_OPACITY = Math::Max(1 - position, 0.1);
         }
@@ -886,7 +910,7 @@ class ScatterHistogram {
 
         for (uint i = 0; !matched && i < histogramGroupArray.Length; i++) {
             if (histogramGroupArray[i] !is null && histogramGroupArray[i].lower <= mouse_hover_x && histogramGroupArray[i].upper > mouse_hover_x) {
-                @histGroup = histogramGroupArray[i];
+                @histGroup = @histogramGroupArray[i];
             }
         }
 
@@ -895,7 +919,7 @@ class ScatterHistogram {
             return;
         }
 
-        if (int(mouse_hover_y) > int(histGroup.DataPointArrays.Length)) {
+        if (int(mouse_hover_y) > int(histGroup.DataPointArrays.Length - 1)) {
             return;
         }
 
