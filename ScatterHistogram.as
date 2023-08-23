@@ -224,15 +224,15 @@ class ScatterHistogram {
         }
 
         this.mapChallenge = ChallengeData(active_map_uuid, challenge_id);
-        @this.rp_pos_arr = @array<vec2>();
-        @this.rp_size_arr = @array<float>();
-        @this.rp_size_offset_arr = @array<float>();
-        @this.rp_color_arr = @array<vec4>();
-        @this.rp_fill_color_arr = @array<vec4>();
-        @this.rp_point_selected_arr = @array<bool>();
-        @this.dataPointsToDecay = @array<DataPoint@>();
-        @this.dataPointsToPrint = @array<DataPoint@>();
-        @this.histogramGroupArray = @array<HistogramGroup@>();
+        this.rp_pos_arr.RemoveRange(0, this.rp_pos_arr.Length);
+        this.rp_size_arr.RemoveRange(0, this.rp_size_arr.Length);
+        this.rp_size_offset_arr.RemoveRange(0, this.rp_size_offset_arr.Length);
+        this.rp_color_arr.RemoveRange(0, this.rp_color_arr.Length);
+        this.rp_fill_color_arr.RemoveRange(0, this.rp_fill_color_arr.Length);
+        this.rp_point_selected_arr.RemoveRange(0, this.rp_point_selected_arr.Length);
+        this.dataPointsToDecay.RemoveRange(0, this.dataPointsToDecay.Length);
+        this.dataPointsToPrint.RemoveRange(0, this.dataPointsToPrint.Length);
+        this.histogramGroupArray.RemoveRange(0, this.histogramGroupArray.Length);
         this.waitForUpdateAndReload();
     }
 
@@ -332,7 +332,7 @@ class ScatterHistogram {
             return;
         }
 
-        @histogramGroupArray = @array<HistogramGroup@>();
+        histogramGroupArray.RemoveRange(0, histogramGroupArray.Length);
 
         int bucket_size = calcHistBucketSize(this.mapChallenge.json_payload);
 
@@ -397,7 +397,6 @@ class ScatterHistogram {
             -1,
             Math::Max(1, getMaxHistogramCount())
         );
-
         vr = valueRange;
     }
     
@@ -483,12 +482,12 @@ class ScatterHistogram {
             return;
         }
 
-        @rp_pos_arr = @array<vec2>();
-        @rp_size_arr = @array<float>();
-        @rp_size_offset_arr = @array<float>();
-        @rp_color_arr = @array<vec4>();
-        @rp_fill_color_arr = @array<vec4>();
-        @rp_point_selected_arr = @array<bool>();
+        rp_pos_arr.RemoveRange(0, rp_pos_arr.Length);
+        rp_size_arr.RemoveRange(0, rp_size_arr.Length);
+        rp_size_offset_arr.RemoveRange(0, rp_size_offset_arr.Length);
+        rp_color_arr.RemoveRange(0, rp_color_arr.Length);
+        rp_fill_color_arr.RemoveRange(0, rp_fill_color_arr.Length);
+        rp_point_selected_arr.RemoveRange(0, rp_point_selected_arr.Length);
 
         rpidxVal = 0;
 
