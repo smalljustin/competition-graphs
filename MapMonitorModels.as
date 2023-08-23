@@ -73,8 +73,8 @@ class ChallengeData {
 
     void terminate() {
         print("Terminating map challenge data for map_uuid " + this.uid + ", challenge " + tostring(this.challenge_id));
-        this.json_payload.RemoveRange(0, this.json_payload.Length);
-        this.divs.RemoveRange(0, this.divs.Length);
+        this.json_payload = array<DataPoint@>();
+        this.divs = array<Div@>();
         this.override_changemap = true;
     }
 
