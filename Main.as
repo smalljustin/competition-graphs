@@ -48,6 +48,21 @@ void Render() {
   }
 }
 
+void RenderMenu() {
+  if (UI::BeginMenu(Icons::BarChart + "COTD Qualification Grapher")) {
+    if (g_visible) {
+      if (UI::MenuItem("Hide Graph")) {
+        g_visible = false;
+      }
+    } else {
+      if (UI::MenuItem("Show Graph")) {
+        g_visible = true;
+      }
+    }
+    UI::EndMenu();
+  }
+}
+
 
 void DoRender() {
   if (shouldNotRender()) {
@@ -113,11 +128,11 @@ int GetChallengeForDate(const string &in date) {
   int previousDateChallenge = _GetChallengeForDate(100, 0, currentTime - (60 * 60 * 24), 0);
 
   if (previousDateChallenge == -1) {
-    print("Couldn't resolve a proper previousDateChallenge! Using hardcoded value from 8/19/23 instead: ");
+    trace("Couldn't resolve a proper previousDateChallenge! Using hardcoded value from 8/19/23 instead: ");
     previousDateChallenge = 4469;
   }
 
-  print("Previous date's challenge: " + tostring(previousDateChallenge));
+  trace("Previous date's challenge: " + tostring(previousDateChallenge));
 
   int challengeGuessOffset = 0;
   challengeGuessOffset += getExpectedChallenges(
@@ -201,7 +216,7 @@ int _GetChallengeForDate (int length, int offset, uint64 expectedStartTime, int 
   for (uint i = 0; i < timeMatchedChallenges.Length; i++) {
     string name = timeMatchedChallenges[i]["name"];
     if (name.Contains("#1 - Challenge") || (name.Contains(" - Challenge") && !name.Contains("#"))) {
-      print(name);
+      trace(name);
       return timeMatchedChallenges[i]["id"];
     }
   }

@@ -50,7 +50,48 @@ class ScatterHistogram {
     float BARHIST_OPACITY = 1;
     float POINTHIST_OPACITY = 0; 
 
+    float start_size_offset = 1;
     float size_offset = 1;
+
+    vec2 helpTextLocation;
+
+    void renderHelpText() {
+        if (!SHOW_HELP_TEXT) {
+            return;
+        }
+
+        if (start_size_offset == 0) {
+            return;
+        }
+
+        array<string> helpText;
+
+        helpText.InsertLast("COTD Qualification Grapher");
+
+        if (size_offset / start_size_offset > 1.5) {
+            helpText.InsertLast("Click and drag (off a bar) to pan");
+            helpText.InsertLast("Use your mouse wheel to zoom.");
+            helpText.InsertLast("Click/drag the border to resize/move");
+            helpText.InsertLast("Click dots for more info.");
+            helpText.InsertLast("Right click to remove labels");   
+            helpText.InsertLast("Disable this text in settings.");   
+        } else {
+            helpText.InsertLast("Zoom in for usage (mouse wheel)");
+        }
+
+   
+        vec2 offset(0);
+
+        for (int i = 0; i < helpText.Length; i++) {
+        renderText(helpText[i],
+        TransformToViewBounds(
+            helpTextLocation,
+            min,
+            max) + offset, false);
+            offset.y += 16;
+        }
+
+    }
     
 
 
@@ -135,7 +176,9 @@ class ScatterHistogram {
         renderMouseHover();
         renderDivs();
         printDataPoints();
-        
+        renderHelpText();
+        renderLoading();
+
         handleWindowMoving();
         handleWindowResize();
         handleDivs();
@@ -143,6 +186,18 @@ class ScatterHistogram {
         updatePbTime();
         startnew(CoroutineFunc(this.handleClickedDecay));
 
+    }
+
+    void renderLoading() {
+        if (!this.mapChallenge.updateComplete) {
+            string text = "[" + tostring(challenge_id) + "] - " "COTD Grapher is loading";
+            for (int i = 1; i < (Time::Now / 600) % 4; i++) {
+                text += ".";
+            }
+            renderText(text,
+            vec2(graph_x_offset + 0.2 * graph_width, graph_y_offset + 0.2 * graph_height),
+             false);
+        }
     }
 
     void handlePointDecay() {
@@ -155,10 +210,16 @@ class ScatterHistogram {
                 continue;
             }
             if (this.dataPointsToDecay[i].decrease()) {
-                rp_size_offset_arr[this.dataPointsToDecay[i].curRenderIdx] = this.dataPointsToDecay[i].focus;
+                int idx = this.dataPointsToDecay[i].curRenderIdx;
+                if (rp_size_offset_arr.Length >= idx) {
+                    rp_size_offset_arr[idx] = this.dataPointsToDecay[i].focus;
+                }
                 continue;
             } else {
-                rp_point_selected_arr[this.dataPointsToDecay[i].curRenderIdx] = false;
+                int idx = this.dataPointsToDecay[i].curRenderIdx;
+                if (rp_point_selected_arr.Length >= idx) {
+                    rp_point_selected_arr[this.dataPointsToDecay[i].curRenderIdx] = false;
+                }
                 @this.dataPointsToDecay[i] = null;
             }
         }
@@ -241,14 +302,9 @@ class ScatterHistogram {
         while (!this.mapChallenge.updateComplete) {
             yield();
         }
-        print("Reloading histogram data.");
         this.reloadHistogramData();
-        print("Reloading value range.");
-        this.reloadValueRange();
-        print("Reloading histogram render.");
         this.reloadHistogramRender();
-        print("waitForUpdateAndReload completed.");
-        size_offset = POINT_RADIUS / (vr.w - vr.z);
+        start_size_offset = size_offset;
     }
 
     int getCutOffTimeAtDiv(int target_time, int precision) {
@@ -365,7 +421,6 @@ class ScatterHistogram {
         reloadValueRange();
         this.cleanPointDecay();
         this.reloadHistogramDataLock = false;
-        print("Histogram data reloaded.");
     }
 
     int calcHistBucketSize(array<DataPoint@>@ dpArr) {
@@ -398,6 +453,10 @@ class ScatterHistogram {
             Math::Max(1, getMaxHistogramCount())
         );
         vr = valueRange;
+        this.helpTextLocation.x = valueRange.x + (valueRange.y - valueRange.x) * 0.5 ;
+        this.helpTextLocation.y = valueRange.w - (valueRange.w - valueRange.z) / 10;
+        size_offset = POINT_RADIUS / (vr.w - vr.z);
+        start_size_offset = size_offset;
     }
     
     int getMaxHistogramCount() {
