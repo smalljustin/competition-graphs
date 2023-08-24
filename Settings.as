@@ -8,7 +8,7 @@ bool SHOW_WITH_HIDDEN_INTERFACE = false;
 bool RENDERINTERFACE_RENDER_MODE = false;
 
 [Setting category="General" name="Show help text"]
-bool SHOW_HELP_TEXT = true;
+bool SHOW_HELP_TEXT = false;
 
 [Setting category="Display" name="Graph Width" drag min=50 max=2000]
 int graph_width = 500;
