@@ -287,7 +287,6 @@ class ScatterHistogram {
         }
 
         this.loading = true;
-        this.mapChallenge = ChallengeData(active_map_uuid, challenge_id);
         this.rp_pos_arr.RemoveRange(0, this.rp_pos_arr.Length);
         this.rp_size_arr.RemoveRange(0, this.rp_size_arr.Length);
         this.rp_size_offset_arr.RemoveRange(0, this.rp_size_offset_arr.Length);
@@ -297,6 +296,7 @@ class ScatterHistogram {
         this.dataPointsToDecay.RemoveRange(0, this.dataPointsToDecay.Length);
         this.dataPointsToPrint.RemoveRange(0, this.dataPointsToPrint.Length);
         this.histogramGroupArray.RemoveRange(0, this.histogramGroupArray.Length);
+        this.mapChallenge = ChallengeData(active_map_uuid, challenge_id);
         this.waitForUpdateAndReload();
     }
 
