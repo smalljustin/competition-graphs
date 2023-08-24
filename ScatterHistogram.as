@@ -58,7 +58,7 @@ class ScatterHistogram {
     vec2 helpTextLocation;
 
     void renderHelpText() {
-        if (!SHOW_HELP_TEXT) {
+        if (!SHOW_HELP_TEXT || loading) {
             return;
         }
 
