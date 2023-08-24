@@ -52,11 +52,11 @@ float TARGET_DISPLAY_PERCENT = 0.875;
 [Setting category="Display" name="Coloration Start Seed" color]
 vec4 HISTOGRAM_RUN_COLOR = vec4(0.19215686274509805, 0.6235294117647059, 0.5803921568627451, 1.0);
 
-[Setting category="General" name="Max records to pull in" drag min=100 max=8000] 
+[Setting category="General" name="Max records to show" drag min=100 max=10000] 
 int MAX_RECORDS = 8000;
 
-[Setting category="General" name="Max Coroutine Frametime" drag min=5 max=50]
-uint64 MAX_FRAMETIME = 5;
+[Setting category="General" name="Max Coroutine Frametime" drag min=3 max=50]
+uint64 MAX_FRAMETIME = 15;
 
 [Setting category="Histogram" name="Bar To Point Transition - Max" drag min=2 max=8]
 float MAX_PR_MULT = 4;

@@ -21,6 +21,8 @@ class ScatterHistogram {
 
     float curPointRadius = POINT_RADIUS;
 
+    bool loading = false;
+
     CLICK_LOCATION curClickLocEnum = CLICK_LOCATION::NOEDGE;
 
     ScatterHistogram() {}
@@ -82,7 +84,7 @@ class ScatterHistogram {
    
         vec2 offset(0);
 
-        for (int i = 0; i < helpText.Length; i++) {
+        for (uint i = 0; i < helpText.Length; i++) {
         renderText(helpText[i],
         TransformToViewBounds(
             helpTextLocation,
@@ -189,9 +191,9 @@ class ScatterHistogram {
     }
 
     void renderLoading() {
-        if (!this.mapChallenge.updateComplete) {
+        if (loading) {
             string text = "[" + tostring(challenge_id) + "] - " "COTD Grapher is loading";
-            for (int i = 1; i < (Time::Now / 600) % 4; i++) {
+            for (uint64 i = 1; i < (Time::Now / 600) % 4; i++) {
                 text += ".";
             }
             renderText(text,
@@ -210,13 +212,13 @@ class ScatterHistogram {
                 continue;
             }
             if (this.dataPointsToDecay[i].decrease()) {
-                int idx = this.dataPointsToDecay[i].curRenderIdx;
+                uint idx = uint(this.dataPointsToDecay[i].curRenderIdx);
                 if (rp_size_offset_arr.Length >= idx) {
                     rp_size_offset_arr[idx] = this.dataPointsToDecay[i].focus;
                 }
                 continue;
             } else {
-                int idx = this.dataPointsToDecay[i].curRenderIdx;
+                uint idx = uint(this.dataPointsToDecay[i].curRenderIdx);
                 if (rp_point_selected_arr.Length >= idx) {
                     rp_point_selected_arr[this.dataPointsToDecay[i].curRenderIdx] = false;
                 }
@@ -284,6 +286,7 @@ class ScatterHistogram {
             this.mapChallenge.terminate();
         }
 
+        this.loading = true;
         this.mapChallenge = ChallengeData(active_map_uuid, challenge_id);
         this.rp_pos_arr.RemoveRange(0, this.rp_pos_arr.Length);
         this.rp_size_arr.RemoveRange(0, this.rp_size_arr.Length);
@@ -305,6 +308,7 @@ class ScatterHistogram {
         this.reloadHistogramData();
         this.reloadHistogramRender();
         start_size_offset = size_offset;
+        this.loading = false;
     }
 
     int getCutOffTimeAtDiv(int target_time, int precision) {
@@ -359,7 +363,7 @@ class ScatterHistogram {
         if (rem == 0) {
             dx = targetBucketSize;
         } else {
-            dx = targetBucketSize + targetBucketSize * (rem / float(int_numdivs)); 
+            dx = int(targetBucketSize + targetBucketSize * (rem / float(int_numdivs))); 
         }
         for (int i = 0; i < int_numdivs; i++) {
             histogramGroupArray.InsertLast(HistogramGroup(mt + dx * i, mt + dx * (i + 1)));
@@ -396,7 +400,7 @@ class ScatterHistogram {
             return;
         }
         
-        for (int i = 1; i < this.mapChallenge.divs.Length; i++) {
+        for (uint i = 1; i < this.mapChallenge.divs.Length; i++) {
             addHistogramGroupsForDiv(@histogramGroupArray, i, bucket_size);
         }
         uint cur_hga = 0;
