@@ -38,7 +38,7 @@ class Challenge {
 class ChallengeData {
     int challenge_id;
     string uid;
-    int length = 100;
+    int length = 20000;
     int offset;
     array < DataPoint @ > @ json_payload = array < DataPoint @ > ();
     float created_ts;
@@ -153,6 +153,7 @@ class ChallengeData {
         }
         this.divs.InsertLast(Div());
         for (uint i = 0; i < this.json_payload.Length; i++) {
+            YieldByTime();
             DataPoint @ dp = @this.json_payload[i];
             if (dp.div != active_div_number) {
                 this.divs.InsertLast(Div());

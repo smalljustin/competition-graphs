@@ -2,7 +2,7 @@
 name = "COTD Qualification Grapher"
 author = "sgt_bigbird"
 category = "Overlay"
-version = "1.0"
+version = "1.1"
 
 [script]
 dependencies = [ "VehicleState", "Camera", "NadeoServices" ]

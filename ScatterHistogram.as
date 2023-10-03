@@ -402,6 +402,7 @@ class ScatterHistogram {
         
         for (uint i = 1; i < this.mapChallenge.divs.Length; i++) {
             addHistogramGroupsForDiv(@histogramGroupArray, i, bucket_size);
+            YieldByTime();
         }
         uint cur_hga = 0;
         // Add actual values to each bucket
@@ -471,6 +472,7 @@ class ScatterHistogram {
         int m = 0; 
         for (uint i = 0; i < histogramGroupArray.Length; i++) {
             m = Math::Max(histogramGroupArray[i].DataPointArrays.Length, m);
+            YieldByTime();
         }
         return m;
     }
@@ -497,6 +499,7 @@ class ScatterHistogram {
         int max_run_id = -1;
         for (uint i = 0; i < arr.Length; i++) {
             max_run_id = Math::Max(max_run_id, arr[i].rank);
+            YieldByTime();
         }
         return max_run_id; 
     }
@@ -505,6 +508,7 @@ class ScatterHistogram {
         int min_run_id = 10 ** 6;
         for (uint i = 0; i < arr.Length; i++) {
             min_run_id = Math::Min(min_run_id, arr[i].rank);
+            YieldByTime();
         }
         return min_run_id;
     }
